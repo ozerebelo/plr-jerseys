@@ -1,0 +1,7 @@
+venv/
+orders.db
+__pycache__/
+*.pyc
+public/uploads/
+.vercel/
+.claude/launch.json

@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Administração de Encomendas</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="container wide">
+    <h1>Catálogo</h1>
+    <p class="subtitle">O que os colegas veem como "disponível" no formulário de encomenda. Adiciona artigos que confirmaste com o fornecedor; desativa quando esgotar.</p>
+
+    <div class="card" style="overflow-x: auto;">
+      <table>
+        <thead>
+          <tr>
+            <th>Imagem</th>
+            <th>Artigo</th>
+            <th>Tamanho</th>
+            <th>Preço</th>
+            <th>Disponível</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in catalog %}
+          {% set item_sizes = (item.size or '').split(',') | map('trim') | list %}
+          <tr>
+            <td>
+              {% if item.image_url %}
+              <img class="thumb" src="{{ image_src(item.image_url) }}" alt="">
+              {% else %}
+              <div class="thumb thumb-empty"></div>
+              {% endif %}
+              <input type="file" name="image" form="catalog-form-{{ item.id }}" accept="image/*" class="thumb-input">
+            </td>
+            <td><input type="text" name="name" form="catalog-form-{{ item.id }}" value="{{ item.name }}" required></td>
+            <td>
+              <div class="size-checks">
+                {% for s in sizes %}
+                <label class="size-check"><input type="checkbox" name="sizes" form="catalog-form-{{ item.id }}" value="{{ s }}" {% if s in item_sizes %}checked{% endif %}>{{ s }}</label>
+                {% endfor %}
+              </div>
+            </td>
+            <td><input type="text" name="price" form="catalog-form-{{ item.id }}" value="{{ item.price or '' }}"></td>
+            <td><input type="checkbox" name="available" form="catalog-form-{{ item.id }}" {% if item.available %}checked{% endif %}></td>
+            <td>
+              <form id="catalog-form-{{ item.id }}" method="POST" action="{{ url_for('update_catalog_item', item_id=item.id) }}" enctype="multipart/form-data" style="display:inline;">
+                <button type="submit">Guardar</button>
+              </form>
+              <form method="POST" action="{{ url_for('delete_catalog_item', item_id=item.id) }}" onsubmit="return confirm('Eliminar este artigo do catálogo?');" style="display:inline;">
+                <button type="submit" class="delete-btn">Eliminar</button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="6" style="color: var(--muted);">Ainda não há artigos no catálogo.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <form method="POST" action="{{ url_for('add_catalog_item') }}" enctype="multipart/form-data" style="margin-top: 14px;">
+        <div class="inline-form" style="flex-wrap: wrap;">
+          <input type="text" name="name" placeholder="Nome do artigo" required>
+          <div class="size-checks">
+            {% for s in sizes %}
+            <label class="size-check"><input type="checkbox" name="sizes" value="{{ s }}">{{ s }}</label>
+            {% endfor %}
+          </div>
+          <input type="text" name="price" placeholder="Preço">
+          <input type="file" name="image" accept="image/*">
+          <button type="submit">Adicionar artigo</button>
+        </div>
+      </form>
+
+      <details class="bulk-add">
+        <summary>Adicionar vários artigos de uma vez</summary>
+        <form method="POST" action="{{ url_for('bulk_add_catalog_items') }}">
+          <label for="bulk_text">Um artigo por linha: <code>Nome | Tamanhos | Preço</code> &mdash; tamanhos (separados por vírgula) e preço são opcionais. Adiciona imagens depois na tabela acima.</label>
+          <textarea id="bulk_text" name="bulk_text" rows="6" placeholder="Argentina Casa 2026 | M, L, XL | 25&#10;Brasil Fora 2026 | S, M, L&#10;Real Madrid Casa"></textarea>
+          <button type="submit">Importar linhas</button>
+        </form>
+      </details>
+    </div>
+
+    <h1>Encomendas ao Fornecedor</h1>
+    <p class="subtitle">As tuas compras ao fornecedor. Cria um lote, marca como encomendado/pago/enviado/recebido, depois associa as linhas de encomenda dos colegas abaixo.</p>
+
+    <div class="card">
+      <form method="POST" action="{{ url_for('add_supplier_order') }}" class="inline-form">
+        <input type="text" name="label" placeholder="Etiqueta (ex: encomenda WhatsApp 7/10)">
+        <button type="submit">Novo lote de fornecedor</button>
+      </form>
+    </div>
+
+    {% if not supplier_orders %}
+    <div class="card"><p style="color: var(--muted); margin: 0;">Ainda não há encomendas ao fornecedor.</p></div>
+    {% endif %}
+
+    {% for so in supplier_orders %}
+    <div class="card order-card">
+      <form id="supplier-form-{{ so.id }}" method="POST" action="{{ url_for('update_supplier_order', supplier_order_id=so.id) }}"></form>
+      <div class="order-card-header">
+        <div class="supplier-milestones">
+          <input type="text" name="label" form="supplier-form-{{ so.id }}" value="{{ so.label or '' }}" placeholder="Etiqueta do Lote #{{ so.id }}">
+          <label><input type="checkbox" name="ordered" form="supplier-form-{{ so.id }}" {% if so.ordered_at %}checked{% endif %}> Encomendado{% if so.ordered_at %} <span class="tiny-date">{{ so.ordered_at }}</span>{% endif %}</label>
+          <label><input type="checkbox" name="paid" form="supplier-form-{{ so.id }}" {% if so.paid_at %}checked{% endif %}> Pago{% if so.paid_at %} <span class="tiny-date">{{ so.paid_at }}</span>{% endif %}</label>
+          <label><input type="checkbox" name="shipped" form="supplier-form-{{ so.id }}" {% if so.shipped_at %}checked{% endif %}> Enviado{% if so.shipped_at %} <span class="tiny-date">{{ so.shipped_at }}</span>{% endif %}</label>
+          <label><input type="checkbox" name="received" form="supplier-form-{{ so.id }}" {% if so.received_at %}checked{% endif %}> Recebido{% if so.received_at %} <span class="tiny-date">{{ so.received_at }}</span>{% endif %}</label>
+          <button type="submit" form="supplier-form-{{ so.id }}">Guardar</button>
+        </div>
+      </div>
+
+      {% if so.linked %}
+      <div style="overflow-x: auto;">
+        <table>
+          <thead>
+            <tr><th>Colega</th><th>Artigo</th><th>Tamanho</th><th>Qtd</th><th>Venda</th><th>Custo</th></tr>
+          </thead>
+          <tbody>
+            {% for o in so.linked %}
+            <tr>
+              <td>{{ o.coworker_name }}</td>
+              <td>{{ o.item_description }}</td>
+              <td>{{ o.size }}</td>
+              <td>{{ o.quantity }}</td>
+              <td>{{ o.price or "" }}</td>
+              <td>{{ o.cost or "" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="muted-text" style="margin: 4px 0 0 0;">Ainda sem artigos associados — associa-os na secção de Encomendas abaixo.</p>
+      {% endif %}
+
+      {% if so.total_price is not none or so.total_cost is not none %}
+      <div class="order-card-footer">
+        {% if so.total_price is not none %}Total de venda: {{ '%.2f'|format(so.total_price) }}{% if so.total_price_partial %}<span class="tiny-date"> (parcial)</span>{% endif %}{% endif %}
+        {% if so.total_cost is not none %} &middot; Total de custo: {{ '%.2f'|format(so.total_cost) }}{% if so.total_cost_partial %}<span class="tiny-date"> (parcial)</span>{% endif %}{% endif %}
+        {% if so.total_margin is not none %} &middot; Margem: {{ '%.2f'|format(so.total_margin) }}{% endif %}
+      </div>
+      {% endif %}
+
+      <form method="POST" action="{{ url_for('delete_supplier_order', supplier_order_id=so.id) }}" onsubmit="return confirm('Eliminar este lote de fornecedor? Os artigos associados ficam apenas desassociados.');" style="margin-top: 10px;">
+        <button type="submit" class="delete-btn">Eliminar lote</button>
+      </form>
+    </div>
+    {% endfor %}
+
+    <h1>Encomendas</h1>
+    <p class="subtitle">Cada cartão é um pedido de um colega. Acompanha o lado do fornecedor — quando encomendaste, pagaste, enviaram, chegou — e vê a margem por artigo.</p>
+
+    {% if not order_groups %}
+    <div class="card"><p style="color: var(--muted); margin: 0;">Ainda não há encomendas.</p></div>
+    {% endif %}
+
+    {% for group in order_groups %}
+    <div class="card order-card">
+      <div class="order-card-header">
+        <div>
+          <strong>{{ group.coworker_name }}</strong>
+          <span class="muted-text">{{ group.created_at }}</span>
+          {% if group.request_id %}<span class="req-id">{{ group.request_id[:6] }}</span>{% endif %}
+        </div>
+        {% if group.notes %}<div class="muted-text">Nota: {{ group.notes }}</div>{% endif %}
+      </div>
+
+      {% if group.lines %}
+      <div style="overflow-x: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Artigo</th>
+              <th>Tamanho</th>
+              <th>Qtd</th>
+              <th>Estado</th>
+              <th>Venda</th>
+              <th>Custo</th>
+              <th>Margem</th>
+              <th>Fornecedor</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for order in group.lines %}
+            <tr>
+              <td>{{ order.item_description }}</td>
+              <td>{{ order.size }}</td>
+              <td>{{ order.quantity }}</td>
+              <td>
+                <select name="status" form="order-form-{{ order.id }}">
+                  {% for s in statuses %}
+                  <option value="{{ s }}" {% if s == order.status %}selected{% endif %}>{{ status_labels[s] }}</option>
+                  {% endfor %}
+                </select>
+              </td>
+              <td><input type="text" name="price" form="order-form-{{ order.id }}" value="{{ order.price or '' }}" placeholder="venda"></td>
+              <td><input type="text" name="cost" form="order-form-{{ order.id }}" value="{{ order.cost or '' }}" placeholder="custo"></td>
+              <td>{{ order.margin if order.margin else "—" }}</td>
+              <td>
+                <select name="supplier_order_id" form="order-form-{{ order.id }}">
+                  <option value="">— nenhum —</option>
+                  {% for so in supplier_orders %}
+                  <option value="{{ so.id }}" {% if order.supplier_order_id == so.id %}selected{% endif %}>{{ so.label or ("Lote #" ~ so.id) }}</option>
+                  {% endfor %}
+                </select>
+              </td>
+              <td>
+                <form id="order-form-{{ order.id }}" method="POST" action="{{ url_for('update_order', order_id=order.id) }}" style="display:inline;">
+                  <button type="submit">Guardar</button>
+                </form>
+                <form method="POST" action="{{ url_for('delete_order', order_id=order.id) }}" onsubmit="return confirm('Eliminar esta encomenda?');" style="display:inline;">
+                  <button type="submit" class="delete-btn">Eliminar</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+
+      {% if group.custom_request %}
+      <div class="custom-request-block">
+        <div class="muted-text">
+          Pedido personalizado
+          <span class="badge {{ group.custom_request.status }}">{{ custom_request_status_labels[group.custom_request.status] }}</span>
+        </div>
+        <p class="custom-request-text">{{ group.custom_request.description }}</p>
+        <form method="POST" action="{{ url_for('update_custom_request', request_id=group.custom_request.id) }}">
+          <div class="inline-form" style="flex-wrap: wrap; align-items: flex-start;">
+            <select name="status">
+              {% for s in custom_request_statuses %}
+              <option value="{{ s }}" {% if s == group.custom_request.status %}selected{% endif %}>{{ custom_request_status_labels[s] }}</option>
+              {% endfor %}
+            </select>
+            <input type="text" name="admin_reply" placeholder="A tua resposta" value="{{ group.custom_request.admin_reply or '' }}" style="flex: 1; min-width: 220px;">
+            <button type="submit">Guardar resposta</button>
+          </div>
+        </form>
+        <form method="POST" action="{{ url_for('delete_custom_request', request_id=group.custom_request.id) }}" onsubmit="return confirm('Eliminar este pedido personalizado?');" style="margin-top: 8px;">
+          <button type="submit" class="delete-btn">Eliminar pedido</button>
+        </form>
+      </div>
+      {% endif %}
+
+      {% if group.total_price is not none or group.total_cost is not none %}
+      <div class="order-card-footer">
+        {% if group.total_price is not none %}Total de venda: {{ '%.2f'|format(group.total_price) }}{% if group.total_price_partial %}<span class="tiny-date"> (parcial)</span>{% endif %}{% endif %}
+        {% if group.total_cost is not none %} &middot; Total de custo: {{ '%.2f'|format(group.total_cost) }}{% if group.total_cost_partial %}<span class="tiny-date"> (parcial)</span>{% endif %}{% endif %}
+        {% if group.total_margin is not none %} &middot; Margem: {{ '%.2f'|format(group.total_margin) }}{% elif group.total_price is not none and group.total_cost is not none %} &middot; <span class="tiny-date">Margem: adiciona os valores de custo/venda em falta para calcular</span>{% endif %}
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+
+    <a class="admin-link" href="{{ url_for('index') }}">voltar ao formulário de encomenda</a>
+  </div>
+</body>
+</html>

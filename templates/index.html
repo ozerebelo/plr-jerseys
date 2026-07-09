@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pedido de Camisola</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="container">
+    <h1>Pedido de Camisola</h1>
+    <p class="subtitle">Preenche isto e eu verifico o stock e o preço, depois digo-te alguma coisa.</p>
+
+    {% if success %}
+      <div class="success">Obrigado! O teu pedido foi enviado. Aviso assim que verificar o stock e o preço.</div>
+    {% endif %}
+    {% if error %}
+      <div class="error">{{ error }}</div>
+    {% endif %}
+
+    <div class="card">
+      <form method="POST" action="{{ url_for('create_order') }}">
+        <label for="coworker_name">O teu nome</label>
+        <input type="text" id="coworker_name" name="coworker_name" required>
+
+        {% if catalog %}
+        <label>Artigos</label>
+        <div class="line-items-header">
+          <span>Artigo</span>
+          <span>Tamanho</span>
+          <span>Qtd</span>
+          <span></span>
+        </div>
+        <div id="items-container">
+          <div class="line-item">
+            <select name="item_description[]" class="item-select" onchange="updateSizes(this)">
+              <option value="" disabled selected>Escolhe um artigo</option>
+              {% for item in catalog %}
+              <option value="{{ item.name }}" data-sizes="{{ item.size or '' }}" data-image="{{ image_src(item.image_url) or '' }}">{{ item.name }}{% if item.price %} — {{ item.price }}{% endif %}</option>
+              {% endfor %}
+            </select>
+            <select name="size[]" class="size-select">
+              <option value="" disabled selected>Escolhe um artigo primeiro</option>
+            </select>
+            <input type="number" name="quantity[]" min="1" value="1" class="qty-input">
+            <button type="button" class="remove-item-btn" onclick="removeLineItem(this)">&times;</button>
+            <img class="item-preview" alt="">
+          </div>
+        </div>
+        <button type="button" class="add-item-btn" onclick="addLineItem()">+ Adicionar outro artigo</button>
+        {% else %}
+        <p class="muted-text" style="margin-top: 14px;">De momento não há nada disponível — mas podes descrever o que procuras abaixo.</p>
+        {% endif %}
+
+        <label for="custom_request">Não vês o que procuras? Descreve aqui (opcional)</label>
+        <textarea id="custom_request" name="custom_request" placeholder="ex: Tens a camisola alternativa do Manchester United 2026 em tamanho L?"></textarea>
+
+        <label for="notes">Notas (opcional)</label>
+        <textarea id="notes" name="notes" placeholder="Nome/número nas costas, manga comprida, etc."></textarea>
+
+        <button type="submit">Enviar Pedido</button>
+      </form>
+    </div>
+
+    <a class="admin-link" href="{{ url_for('admin') }}">administração</a>
+  </div>
+
+  <script>
+    function updateSizes(selectEl) {
+      const row = selectEl.closest('.line-item');
+      const sizeSelect = row.querySelector('.size-select');
+      const selected = selectEl.options[selectEl.selectedIndex];
+      const sizes = (selected.dataset.sizes || '')
+        .split(',')
+        .map(function (s) { return s.trim(); })
+        .filter(Boolean);
+
+      sizeSelect.innerHTML = '';
+
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.disabled = true;
+      placeholder.selected = true;
+      placeholder.textContent = sizes.length ? 'Escolhe um tamanho' : 'Sem tamanhos indicados';
+      sizeSelect.appendChild(placeholder);
+
+      sizes.forEach(function (s) {
+        const opt = document.createElement('option');
+        opt.value = s;
+        opt.textContent = s;
+        sizeSelect.appendChild(opt);
+      });
+
+      const preview = row.querySelector('.item-preview');
+      if (selected.dataset.image) {
+        preview.src = selected.dataset.image;
+        preview.style.display = 'block';
+      } else {
+        preview.removeAttribute('src');
+        preview.style.display = 'none';
+      }
+    }
+
+    function addLineItem() {
+      const container = document.getElementById('items-container');
+      const template = container.querySelector('.line-item');
+      const clone = template.cloneNode(true);
+      clone.querySelector('.item-select').selectedIndex = 0;
+      clone.querySelector('.size-select').innerHTML = '<option value="" disabled selected>Escolhe um artigo primeiro</option>';
+      clone.querySelector('.qty-input').value = 1;
+      const preview = clone.querySelector('.item-preview');
+      preview.removeAttribute('src');
+      preview.style.display = 'none';
+      container.appendChild(clone);
+      updateRemoveButtons();
+    }
+
+    function removeLineItem(btn) {
+      const container = document.getElementById('items-container');
+      const row = btn.closest('.line-item');
+      if (container.children.length > 1) {
+        row.remove();
+      }
+      updateRemoveButtons();
+    }
+
+    function updateRemoveButtons() {
+      const rows = document.querySelectorAll('#items-container .line-item');
+      rows.forEach(function (row) {
+        row.querySelector('.remove-item-btn').style.display = rows.length > 1 ? 'inline-block' : 'none';
+      });
+    }
+
+    updateRemoveButtons();
+  </script>
+</body>
+</html>
