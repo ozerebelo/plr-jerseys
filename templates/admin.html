@@ -189,7 +189,7 @@
           <tbody>
             {% for order in group.lines %}
             <tr>
-              <td>{{ order.item_description }}</td>
+              <td>{{ order.item_description }}{% if order.is_custom %} <span class="badge-custom">Personalizado</span>{% endif %}</td>
               <td>{{ order.size }}</td>
               <td>{{ order.quantity }}</td>
               <td>
@@ -243,9 +243,14 @@
             <button type="submit">Guardar resposta</button>
           </div>
         </form>
-        <form method="POST" action="{{ url_for('delete_custom_request', request_id=group.custom_request.id) }}" onsubmit="return confirm('Eliminar este pedido personalizado?');" style="margin-top: 8px;">
-          <button type="submit" class="delete-btn">Eliminar pedido</button>
-        </form>
+        <div class="inline-form" style="margin-top: 8px;">
+          <form method="POST" action="{{ url_for('promote_custom_request', request_id=group.custom_request.id) }}">
+            <button type="submit">Adicionar ao catálogo</button>
+          </form>
+          <form method="POST" action="{{ url_for('delete_custom_request', request_id=group.custom_request.id) }}" onsubmit="return confirm('Eliminar este pedido personalizado?');">
+            <button type="submit" class="delete-btn">Eliminar pedido</button>
+          </form>
+        </div>
       </div>
       {% endif %}
 

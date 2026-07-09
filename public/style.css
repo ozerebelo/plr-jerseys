@@ -151,6 +151,17 @@ th {
 .badge.rejected { background: #450a0a; color: #fca5a5; }
 .badge.answered { background: #1e3a8a; color: #93c5fd; }
 
+.badge-custom {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  background: #422006;
+  color: #fbbf24;
+  white-space: nowrap;
+}
+
 .custom-request-block {
   margin-top: 14px;
   padding-top: 12px;
@@ -241,6 +252,14 @@ a.admin-link {
 
 .line-item select, .line-item input {
   margin: 0;
+}
+
+.item-field, .size-field {
+  display: contents;
+}
+
+.item-custom-input, .size-custom-input {
+  display: none;
 }
 
 .item-preview {

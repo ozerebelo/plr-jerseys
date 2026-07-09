@@ -23,8 +23,10 @@
         <label for="coworker_name">O teu nome</label>
         <input type="text" id="coworker_name" name="coworker_name" required>
 
-        {% if catalog %}
         <label>Artigos</label>
+        {% if not catalog %}
+        <p class="muted-text" style="margin-top: 4px;">Nada listado como disponível de momento — mas podes escrever um artigo à mão abaixo.</p>
+        {% endif %}
         <div class="line-items-header">
           <span>Artigo</span>
           <span>Tamanho</span>
@@ -33,27 +35,32 @@
         </div>
         <div id="items-container">
           <div class="line-item">
-            <select name="item_description[]" class="item-select" onchange="updateSizes(this)">
-              <option value="" disabled selected>Escolhe um artigo</option>
-              {% for item in catalog %}
-              <option value="{{ item.name }}" data-sizes="{{ item.size or '' }}" data-image="{{ image_src(item.image_url) or '' }}">{{ item.name }}{% if item.price %} — {{ item.price }}{% endif %}</option>
-              {% endfor %}
-            </select>
-            <select name="size[]" class="size-select">
-              <option value="" disabled selected>Escolhe um artigo primeiro</option>
-            </select>
+            <div class="item-field">
+              <select name="item_description[]" class="item-select" onchange="updateSizes(this)">
+                <option value="" disabled selected>Escolhe um artigo</option>
+                {% for item in catalog %}
+                <option value="{{ item.name }}" data-sizes="{{ item.size or '' }}" data-image="{{ image_src(item.image_url) or '' }}">{{ item.name }}{% if item.price %} — {{ item.price }}{% endif %}</option>
+                {% endfor %}
+                <option value="__custom__">+ Outro artigo (escreve à mão)</option>
+              </select>
+              <input type="text" name="item_description[]" class="item-custom-input" placeholder="Nome do artigo" disabled>
+            </div>
+            <div class="size-field">
+              <select name="size[]" class="size-select">
+                <option value="" disabled selected>Escolhe um artigo primeiro</option>
+              </select>
+              <input type="text" name="size[]" class="size-custom-input" placeholder="Tamanho" disabled>
+            </div>
             <input type="number" name="quantity[]" min="1" value="1" class="qty-input">
             <button type="button" class="remove-item-btn" onclick="removeLineItem(this)">&times;</button>
             <img class="item-preview" alt="">
           </div>
         </div>
         <button type="button" class="add-item-btn" onclick="addLineItem()">+ Adicionar outro artigo</button>
-        {% else %}
-        <p class="muted-text" style="margin-top: 14px;">De momento não há nada disponível — mas podes descrever o que procuras abaixo.</p>
-        {% endif %}
+        <p class="muted-text" style="margin-top: 8px;">Um artigo escrito à mão não tem preço definido — confirmo contigo depois de veres o pedido.</p>
 
-        <label for="custom_request">Não vês o que procuras? Descreve aqui (opcional)</label>
-        <textarea id="custom_request" name="custom_request" placeholder="ex: Tens a camisola alternativa do Manchester United 2026 em tamanho L?"></textarea>
+        <label for="custom_request">Tens só uma pergunta? Escreve aqui (opcional)</label>
+        <textarea id="custom_request" name="custom_request" placeholder="ex: Tens tamanhos de criança?"></textarea>
 
         <label for="notes">Notas (opcional)</label>
         <textarea id="notes" name="notes" placeholder="Nome/número nas costas, manga comprida, etc."></textarea>
@@ -69,6 +76,27 @@
     function updateSizes(selectEl) {
       const row = selectEl.closest('.line-item');
       const sizeSelect = row.querySelector('.size-select');
+      const sizeCustomInput = row.querySelector('.size-custom-input');
+      const itemCustomInput = row.querySelector('.item-custom-input');
+      const preview = row.querySelector('.item-preview');
+
+      if (selectEl.value === '__custom__') {
+        selectEl.disabled = true;
+        selectEl.style.display = 'none';
+        itemCustomInput.disabled = false;
+        itemCustomInput.style.display = 'block';
+        itemCustomInput.focus();
+
+        sizeSelect.disabled = true;
+        sizeSelect.style.display = 'none';
+        sizeCustomInput.disabled = false;
+        sizeCustomInput.style.display = 'block';
+
+        preview.removeAttribute('src');
+        preview.style.display = 'none';
+        return;
+      }
+
       const selected = selectEl.options[selectEl.selectedIndex];
       const sizes = (selected.dataset.sizes || '')
         .split(',')
@@ -91,7 +119,6 @@
         sizeSelect.appendChild(opt);
       });
 
-      const preview = row.querySelector('.item-preview');
       if (selected.dataset.image) {
         preview.src = selected.dataset.image;
         preview.style.display = 'block';
@@ -101,16 +128,37 @@
       }
     }
 
+    function resetLineItem(row) {
+      const itemSelect = row.querySelector('.item-select');
+      const itemCustomInput = row.querySelector('.item-custom-input');
+      const sizeSelect = row.querySelector('.size-select');
+      const sizeCustomInput = row.querySelector('.size-custom-input');
+      const preview = row.querySelector('.item-preview');
+
+      itemSelect.selectedIndex = 0;
+      itemSelect.disabled = false;
+      itemSelect.style.display = '';
+      itemCustomInput.value = '';
+      itemCustomInput.disabled = true;
+      itemCustomInput.style.display = 'none';
+
+      sizeSelect.innerHTML = '<option value="" disabled selected>Escolhe um artigo primeiro</option>';
+      sizeSelect.disabled = false;
+      sizeSelect.style.display = '';
+      sizeCustomInput.value = '';
+      sizeCustomInput.disabled = true;
+      sizeCustomInput.style.display = 'none';
+
+      row.querySelector('.qty-input').value = 1;
+      preview.removeAttribute('src');
+      preview.style.display = 'none';
+    }
+
     function addLineItem() {
       const container = document.getElementById('items-container');
       const template = container.querySelector('.line-item');
       const clone = template.cloneNode(true);
-      clone.querySelector('.item-select').selectedIndex = 0;
-      clone.querySelector('.size-select').innerHTML = '<option value="" disabled selected>Escolhe um artigo primeiro</option>';
-      clone.querySelector('.qty-input').value = 1;
-      const preview = clone.querySelector('.item-preview');
-      preview.removeAttribute('src');
-      preview.style.display = 'none';
+      resetLineItem(clone);
       container.appendChild(clone);
       updateRemoveButtons();
     }

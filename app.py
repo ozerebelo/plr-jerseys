@@ -82,10 +82,12 @@ def init_db():
                 cost TEXT,
                 created_at TEXT NOT NULL,
                 request_id TEXT,
-                supplier_order_id INTEGER
+                supplier_order_id INTEGER,
+                is_custom INTEGER NOT NULL DEFAULT 0
             )
             """
         )
+        db.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS is_custom INTEGER NOT NULL DEFAULT 0")
         db.execute(
             """
             CREATE TABLE IF NOT EXISTS catalog_items (
@@ -208,20 +210,30 @@ def create_order():
             continue
 
         matched_item = catalog_by_name.get(name)
-        valid_sizes = [s.strip() for s in (matched_item["size"] or "").split(",") if s.strip()] if matched_item else []
-        if not matched_item or size not in valid_sizes:
-            return render_template(
-                "index.html",
-                error="Um dos artigos ou tamanhos não é válido — volta a escolher da lista.",
-                catalog=catalog,
-            )
+        if matched_item:
+            valid_sizes = [s.strip() for s in (matched_item["size"] or "").split(",") if s.strip()]
+            if size not in valid_sizes:
+                return render_template(
+                    "index.html",
+                    error="Um dos artigos ou tamanhos não é válido — volta a escolher da lista.",
+                    catalog=catalog,
+                )
+            is_custom = False
+        else:
+            if not name or not size:
+                return render_template(
+                    "index.html",
+                    error="Preenche o nome e o tamanho do artigo personalizado.",
+                    catalog=catalog,
+                )
+            is_custom = True
 
         try:
             quantity = max(1, int(quantities[i].strip())) if i < len(quantities) else 1
         except ValueError:
             quantity = 1
 
-        line_items.append((name, size, quantity))
+        line_items.append((name, size, quantity, is_custom))
 
     if not coworker_name or (not line_items and not custom_request_text):
         return render_template(
@@ -232,13 +244,13 @@ def create_order():
 
     request_id = uuid.uuid4().hex[:8]
     created_at = datetime.now().isoformat(timespec="seconds")
-    for name, size, quantity in line_items:
+    for name, size, quantity, is_custom in line_items:
         db.execute(
             """
-            INSERT INTO orders (coworker_name, item_description, size, quantity, notes, status, created_at, request_id)
-            VALUES (%s, %s, %s, %s, %s, 'pending', %s, %s)
+            INSERT INTO orders (coworker_name, item_description, size, quantity, notes, status, created_at, request_id, is_custom)
+            VALUES (%s, %s, %s, %s, %s, 'pending', %s, %s, %s)
             """,
-            (coworker_name, name, size, quantity, notes, created_at, request_id),
+            (coworker_name, name, size, quantity, notes, created_at, request_id, 1 if is_custom else 0),
         )
 
     if custom_request_text:
@@ -510,6 +522,28 @@ def update_custom_request(request_id):
 def delete_custom_request(request_id):
     db = get_db()
     db.execute("DELETE FROM custom_requests WHERE id = %s", (request_id,))
+    db.commit()
+    return redirect(url_for("admin"))
+
+
+@app.route("/admin/custom_requests/promote/<int:request_id>", methods=["POST"])
+def promote_custom_request(request_id):
+    db = get_db()
+    row = db.execute("SELECT * FROM custom_requests WHERE id = %s", (request_id,)).fetchone()
+    if row is None:
+        return redirect(url_for("admin"))
+
+    db.execute(
+        """
+        INSERT INTO catalog_items (name, size, price, available, created_at)
+        VALUES (%s, '', '', 0, %s)
+        """,
+        (row["description"], datetime.now().isoformat(timespec="seconds")),
+    )
+    db.execute(
+        "UPDATE custom_requests SET status = 'answered', admin_reply = %s WHERE id = %s",
+        (row["admin_reply"] or "Adicionado ao catálogo.", request_id),
+    )
     db.commit()
     return redirect(url_for("admin"))
 
