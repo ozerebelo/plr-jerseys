@@ -43,7 +43,7 @@
                 {% for category, items in catalog|groupby('category') %}
                 <optgroup label="{{ category or 'Outros' }}">
                   {% for item in items %}
-                  <option value="{{ item.name }}" data-seasons="{{ item.seasons or '' }}" data-kit-types="{{ item.kit_types or '' }}" data-sizes="{{ item.size or '' }}" data-image="{{ image_src(item.image_url) or '' }}">{{ item.name }} — {{ item.display_price }}</option>
+                  <option value="{{ item.name }}" data-seasons="{{ item.seasons or '' }}" data-kit-types="{{ item.kit_types or '' }}" data-sizes="{{ item.size or '' }}" data-image="{{ image_src(item.image_url) or '' }}" data-images='{{ item.variant_images | tojson }}'>{{ item.name }} — {{ item.display_price }}</option>
                   {% endfor %}
                 </optgroup>
                 {% endfor %}
@@ -51,10 +51,10 @@
               </select>
               <input type="text" name="item_description[]" class="item-custom-input" placeholder="Nome do artigo" disabled>
             </div>
-            <select name="season[]" class="season-select">
+            <select name="season[]" class="season-select" onchange="updatePreviewImage(this)">
               <option value="" disabled selected>Escolhe um artigo primeiro</option>
             </select>
-            <select name="kit_type[]" class="kit-select">
+            <select name="kit_type[]" class="kit-select" onchange="updatePreviewImage(this)">
               <option value="" disabled selected>Escolhe um artigo primeiro</option>
             </select>
             <div class="size-field">
@@ -180,8 +180,35 @@
         sizeSelect.appendChild(opt);
       });
 
-      if (selected.dataset.image) {
-        preview.src = selected.dataset.image;
+      updatePreviewImage(selectEl);
+    }
+
+    function updatePreviewImage(selectEl) {
+      const row = selectEl.closest('.line-item');
+      const itemSelect = row.querySelector('.item-select');
+      const preview = row.querySelector('.item-preview');
+
+      if (itemSelect.disabled || !itemSelect.value || itemSelect.value === '__custom__') {
+        preview.removeAttribute('src');
+        preview.style.display = 'none';
+        return;
+      }
+
+      const selected = itemSelect.options[itemSelect.selectedIndex];
+      let variantImages = {};
+      try {
+        variantImages = JSON.parse(selected.dataset.images || '{}');
+      } catch (e) {
+        variantImages = {};
+      }
+
+      const seasonVal = row.querySelector('.season-select').value;
+      const kitVal = row.querySelector('.kit-select').value;
+      const key = kitVal + '|' + seasonVal;
+      const src = variantImages[key] || selected.dataset.image;
+
+      if (src) {
+        preview.src = src;
         preview.style.display = 'block';
       } else {
         preview.removeAttribute('src');

@@ -134,6 +134,19 @@ def init_db():
         db.execute("ALTER TABLE catalog_items ADD COLUMN IF NOT EXISTS seasons TEXT")
         db.execute(
             """
+            CREATE TABLE IF NOT EXISTS catalog_item_images (
+                id SERIAL PRIMARY KEY,
+                catalog_item_id INTEGER NOT NULL REFERENCES catalog_items(id) ON DELETE CASCADE,
+                kit_type TEXT NOT NULL,
+                season TEXT NOT NULL,
+                image_url TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                UNIQUE (catalog_item_id, kit_type, season)
+            )
+            """
+        )
+        db.execute(
+            """
             CREATE TABLE IF NOT EXISTS supplier_orders (
                 id SERIAL PRIMARY KEY,
                 label TEXT,
@@ -200,8 +213,7 @@ def save_uploaded_image(file_storage):
     return f"uploads/{unique_name}"
 
 
-@app.template_global()
-def image_src(image_url):
+def resolve_image_src(image_url):
     if not image_url:
         return None
     if image_url.startswith("http://") or image_url.startswith("https://"):
@@ -209,12 +221,61 @@ def image_src(image_url):
     return url_for("static", filename=image_url)
 
 
-def with_display_price(catalog_rows):
+@app.template_global()
+def image_src(image_url):
+    return resolve_image_src(image_url)
+
+
+def enrich_catalog_items(db, catalog_rows):
+    ids = [row["id"] for row in catalog_rows]
+    variants_by_item = {}
+    if ids:
+        placeholders = ",".join(["%s"] * len(ids))
+        variant_rows = db.execute(
+            f"SELECT catalog_item_id, kit_type, season, image_url FROM catalog_item_images WHERE catalog_item_id IN ({placeholders})",
+            tuple(ids),
+        ).fetchall()
+        for vr in variant_rows:
+            key = f"{vr['kit_type']}|{vr['season']}"
+            variants_by_item.setdefault(vr["catalog_item_id"], {})[key] = resolve_image_src(vr["image_url"])
+
     items = []
     for row in catalog_rows:
         item = dict(row)
         price = VINTAGE_PRICE if item["category"] == "Vintage" else BASE_PRICE
         item["display_price"] = f"{price:.0f}€"
+        item["variant_images"] = variants_by_item.get(item["id"], {})
+        items.append(item)
+    return items
+
+
+def attach_variant_combos(db, catalog_rows):
+    ids = [row["id"] for row in catalog_rows]
+    variant_lookup = {}
+    if ids:
+        placeholders = ",".join(["%s"] * len(ids))
+        for vr in db.execute(
+            f"SELECT catalog_item_id, kit_type, season, image_url FROM catalog_item_images WHERE catalog_item_id IN ({placeholders})",
+            tuple(ids),
+        ).fetchall():
+            variant_lookup[(vr["catalog_item_id"], vr["kit_type"], vr["season"])] = vr["image_url"]
+
+    items = []
+    for row in catalog_rows:
+        item = dict(row)
+        item_kit_types = [k.strip() for k in (item["kit_types"] or "").split(",") if k.strip()]
+        item_seasons = [s.strip() for s in (item["seasons"] or "").split(",") if s.strip()]
+        combos = []
+        for kt in item_kit_types:
+            for se in item_seasons:
+                combos.append(
+                    {
+                        "kit_type": kt,
+                        "season": se,
+                        "image_url": variant_lookup.get((item["id"], kt, se)),
+                    }
+                )
+        item["variant_combos"] = combos
         items.append(item)
     return items
 
@@ -222,10 +283,11 @@ def with_display_price(catalog_rows):
 @app.route("/")
 def index():
     db = get_db()
-    catalog = with_display_price(
+    catalog = enrich_catalog_items(
+        db,
         db.execute(
             "SELECT * FROM catalog_items WHERE available = 1 ORDER BY category ASC NULLS LAST, name ASC"
-        ).fetchall()
+        ).fetchall(),
     )
     return render_template("index.html", catalog=catalog)
 
@@ -244,10 +306,11 @@ def create_order():
     personalize_texts = request.form.getlist("personalize_text[]")
 
     db = get_db()
-    catalog = with_display_price(
+    catalog = enrich_catalog_items(
+        db,
         db.execute(
             "SELECT * FROM catalog_items WHERE available = 1 ORDER BY category ASC NULLS LAST, name ASC"
-        ).fetchall()
+        ).fetchall(),
     )
     catalog_by_name = {c["name"]: c for c in catalog}
 
@@ -267,12 +330,14 @@ def create_order():
         matched_item = catalog_by_name.get(name)
         if matched_item:
             valid_sizes = [s.strip() for s in (matched_item["size"] or "").split(",") if s.strip()]
-            if size not in valid_sizes:
+            if valid_sizes and size not in valid_sizes:
                 return render_template(
                     "index.html",
                     error="Um dos artigos ou tamanhos não é válido — volta a escolher da lista.",
                     catalog=catalog,
                 )
+            if not valid_sizes:
+                size = ""
             valid_kit_types = [k.strip() for k in (matched_item["kit_types"] or "").split(",") if k.strip()]
             if valid_kit_types and kit_type not in valid_kit_types:
                 return render_template(
@@ -478,7 +543,9 @@ def admin():
             }
         )
 
-    catalog = db.execute("SELECT * FROM catalog_items ORDER BY category ASC NULLS LAST, name ASC").fetchall()
+    catalog = attach_variant_combos(
+        db, db.execute("SELECT * FROM catalog_items ORDER BY category ASC NULLS LAST, name ASC").fetchall()
+    )
     return render_template(
         "admin.html",
         order_groups=order_groups,
@@ -593,6 +660,28 @@ def update_catalog_item(item_id):
             item_id,
         ),
     )
+
+    variant_kit_types = request.form.getlist("variant_kit_type[]")
+    variant_seasons = request.form.getlist("variant_season[]")
+    variant_files = request.files.getlist("variant_image[]")
+    for i, vk in enumerate(variant_kit_types):
+        vs = variant_seasons[i] if i < len(variant_seasons) else ""
+        vf = variant_files[i] if i < len(variant_files) else None
+        if not vk or not vs:
+            continue
+        variant_image_url = save_uploaded_image(vf)
+        if not variant_image_url:
+            continue
+        db.execute(
+            """
+            INSERT INTO catalog_item_images (catalog_item_id, kit_type, season, image_url, created_at)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (catalog_item_id, kit_type, season)
+            DO UPDATE SET image_url = EXCLUDED.image_url
+            """,
+            (item_id, vk, vs, variant_image_url, datetime.now().isoformat(timespec="seconds")),
+        )
+
     db.commit()
     return redirect(url_for("admin"))
 

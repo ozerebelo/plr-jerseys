@@ -418,6 +418,25 @@ a.admin-link {
   color: var(--muted);
 }
 
+.variant-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.variant-image-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.variant-image-label {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
 .bulk-add {
   margin-top: 16px;
   border-top: 1px solid var(--border);

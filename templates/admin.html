@@ -82,6 +82,35 @@
               </form>
             </td>
           </tr>
+          {% if item.variant_combos %}
+          <tr>
+            <td colspan="8" style="padding-top: 0;">
+              <div class="variant-images">
+                {% for combo in item.variant_combos %}
+                <div class="variant-image-slot">
+                  {% if combo.image_url %}
+                  <img class="thumb" src="{{ image_src(combo.image_url) }}" alt="">
+                  {% else %}
+                  <div class="thumb thumb-empty"></div>
+                  {% endif %}
+                  <span class="variant-image-label">{{ combo.kit_type }} · {{ combo.season }}</span>
+                  <input type="hidden" name="variant_kit_type[]" form="catalog-form-{{ item.id }}" value="{{ combo.kit_type }}">
+                  <input type="hidden" name="variant_season[]" form="catalog-form-{{ item.id }}" value="{{ combo.season }}">
+                  <input type="file" name="variant_image[]" form="catalog-form-{{ item.id }}" accept="image/*" class="thumb-input">
+                </div>
+                {% endfor %}
+              </div>
+            </td>
+          </tr>
+          {% elif item.kit_types and item.seasons %}
+          <tr>
+            <td colspan="8" class="muted-text" style="padding-top: 0;">Guarda o artigo para poderes adicionar imagens por temporada/tipo.</td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="8" class="muted-text" style="padding-top: 0;">Define temporadas e tipos para poderes adicionar imagens por combinação.</td>
+          </tr>
+          {% endif %}
           {% else %}
           <tr>
             <td colspan="8" style="color: var(--muted);">Ainda não há artigos no catálogo.</td>
