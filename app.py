@@ -613,6 +613,48 @@ def bulk_add_catalog_items():
     return redirect(url_for("admin"))
 
 
+@app.route("/admin/catalog/bulk_edit", methods=["POST"])
+def bulk_edit_catalog_items():
+    bulk_text = request.form.get("bulk_edit_text", "")
+
+    db = get_db()
+    for line in bulk_text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+
+        parts = [p.strip() for p in line.split("|")]
+        if len(parts) < 4:
+            continue
+
+        try:
+            item_id = int(parts[0])
+        except ValueError:
+            continue
+
+        available = 1 if parts[1].strip().lower() in ("sim", "s", "1", "yes") else 0
+        category = parts[2] if parts[2] in CATEGORIES else ""
+        name = parts[3]
+        if not name:
+            continue
+
+        seasons = [s.strip() for s in parts[4].split(",") if s.strip() in SEASONS] if len(parts) > 4 else []
+        kit_types = [k.strip() for k in parts[5].split(",") if k.strip() in KIT_TYPES] if len(parts) > 5 else []
+        sizes = [s.strip() for s in parts[6].split(",") if s.strip() in SIZES] if len(parts) > 6 else []
+
+        db.execute(
+            """
+            UPDATE catalog_items
+            SET name = %s, size = %s, available = %s, category = %s, kit_types = %s, seasons = %s
+            WHERE id = %s
+            """,
+            (name, ", ".join(sizes), available, category or None, ", ".join(kit_types), ", ".join(seasons), item_id),
+        )
+    db.commit()
+
+    return redirect(url_for("admin"))
+
+
 @app.route("/admin/catalog/add", methods=["POST"])
 def add_catalog_item():
     name = request.form.get("name", "").strip()

@@ -163,6 +163,18 @@
           <button type="submit">Importar linhas</button>
         </form>
       </details>
+
+      {% if catalog %}
+      <details class="bulk-add">
+        <summary>Editar catálogo em massa</summary>
+        <form method="POST" action="{{ url_for('bulk_edit_catalog_items') }}">
+          <label for="bulk_edit_text">Uma linha por artigo: <code>ID | Disponível (sim/não) | Categoria | Nome | Temporadas | Tipos | Tamanhos</code> &mdash; edita o texto abaixo e grava tudo de uma vez. Isto só atualiza artigos existentes (pelo ID no início da linha); não apaga nem cria artigos novos, e não mexe nas imagens.</label>
+          <textarea id="bulk_edit_text" name="bulk_edit_text" rows="{{ catalog|length + 1 }}">{% for item in catalog %}{{ item.id }} | {{ 'sim' if item.available else 'não' }} | {{ item.category or '' }} | {{ item.name }} | {{ item.seasons or '' }} | {{ item.kit_types or '' }} | {{ item.size or '' }}
+{% endfor %}</textarea>
+          <button type="submit">Guardar alterações em massa</button>
+        </form>
+      </details>
+      {% endif %}
     </div>
 
     <h1>Encomendas ao Fornecedor</h1>
