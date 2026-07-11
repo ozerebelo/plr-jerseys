@@ -257,6 +257,7 @@
       <div class="order-card-header">
         <div>
           <strong>{{ group.coworker_name }}</strong>
+          {% if group.phone %}<span class="muted-text">{{ group.phone }}</span>{% endif %}
           <span class="muted-text">{{ group.created_at }}</span>
           {% if group.request_id %}<span class="req-id">{{ group.request_id[:6] }}</span>{% endif %}
         </div>

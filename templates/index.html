@@ -13,7 +13,6 @@
   <div class="container">
     <header class="site-header">
       <a class="brand" href="{{ url_for('index') }}"><span class="brand-mark">PLR</span><span class="brand-rest">-Jerseys</span></a>
-      <span class="brand-tagline">Encomendas internas</span>
     </header>
     <h1>Pedido de Camisola</h1>
     <p class="subtitle">Preenche isto e eu verifico o stock e o preço, depois digo-te alguma coisa.</p>
@@ -29,6 +28,9 @@
       <form method="POST" action="{{ url_for('create_order') }}">
         <label for="coworker_name">O teu nome</label>
         <input type="text" id="coworker_name" name="coworker_name" required>
+
+        <label for="phone">Telemóvel</label>
+        <input type="tel" id="phone" name="phone" placeholder="912 345 678" required>
 
         <label>Artigos</label>
         {% if not catalog %}

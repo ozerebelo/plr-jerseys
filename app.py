@@ -32,15 +32,17 @@ CATEGORIES = [
     "Premier League",
     "Bundesliga",
     "Serie A",
-    "Mundial 2026",
-    "Euro 2024",
-    "Outras Seleções",
+    "Internacional",
     "Outros",
     "Vintage",
 ]
 KIT_TYPES = ["Casa", "Fora", "Alternativa", "Outro"]
 _season_start_year = datetime.now().year if datetime.now().month >= 7 else datetime.now().year - 1
-SEASONS = [f"{_season_start_year - i}/{_season_start_year - i + 1}" for i in range(4)]
+SEASONS = [f"{_season_start_year - i}/{_season_start_year - i + 1}" for i in range(4)] + [
+    "Mundial 2026",
+    "Euro 2024",
+    "Outras Seleções",
+]
 BASE_PRICE = 22.0
 VINTAGE_PRICE = 25.0
 PERSONALIZATION_PRICE = 2.5
@@ -106,7 +108,8 @@ def init_db():
                 kit_type TEXT,
                 season TEXT,
                 personalization TEXT,
-                item_note TEXT
+                item_note TEXT,
+                phone TEXT
             )
             """
         )
@@ -115,6 +118,7 @@ def init_db():
         db.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS season TEXT")
         db.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS personalization TEXT")
         db.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS item_note TEXT")
+        db.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS phone TEXT")
         db.execute(
             """
             CREATE TABLE IF NOT EXISTS catalog_items (
@@ -169,8 +173,22 @@ def init_db():
                 description TEXT NOT NULL,
                 admin_reply TEXT,
                 status TEXT NOT NULL DEFAULT 'pending',
-                created_at TEXT NOT NULL
+                created_at TEXT NOT NULL,
+                phone TEXT
             )
+            """
+        )
+        db.execute("ALTER TABLE custom_requests ADD COLUMN IF NOT EXISTS phone TEXT")
+        db.execute(
+            """
+            UPDATE catalog_items
+            SET category = 'Internacional',
+                seasons = CASE
+                    WHEN seasons IS NULL OR seasons = '' THEN category
+                    WHEN position(category IN seasons) > 0 THEN seasons
+                    ELSE seasons || ', ' || category
+                END
+            WHERE category IN ('Mundial 2026', 'Euro 2024', 'Outras Seleções')
             """
         )
         db.commit()
@@ -298,6 +316,7 @@ def index():
 @app.route("/order", methods=["POST"])
 def create_order():
     coworker_name = request.form.get("coworker_name", "").strip()
+    phone = request.form.get("phone", "").strip()
     notes = request.form.get("notes", "").strip()
     custom_request_text = request.form.get("custom_request", "").strip()
     item_names = request.form.getlist("item_description[]")
@@ -399,10 +418,10 @@ def create_order():
 
         line_items.append((name, season, kit_type, size, quantity, is_custom, price_str, personalization, item_note))
 
-    if not coworker_name or (not line_items and not custom_request_text):
+    if not coworker_name or not phone or (not line_items and not custom_request_text):
         return render_template(
             "index.html",
-            error="Preenche o teu nome e escolhe um artigo ou descreve o que procuras.",
+            error="Preenche o teu nome, o teu telemóvel, e escolhe um artigo ou descreve o que procuras.",
             catalog=catalog,
         )
 
@@ -413,8 +432,8 @@ def create_order():
             """
             INSERT INTO orders
                 (coworker_name, item_description, season, kit_type, size, quantity, notes, status,
-                 price, created_at, request_id, is_custom, personalization, item_note)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, 'pending', %s, %s, %s, %s, %s, %s)
+                 price, created_at, request_id, is_custom, personalization, item_note, phone)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, 'pending', %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 coworker_name,
@@ -430,16 +449,17 @@ def create_order():
                 1 if is_custom else 0,
                 personalization or None,
                 item_note or None,
+                phone,
             ),
         )
 
     if custom_request_text:
         db.execute(
             """
-            INSERT INTO custom_requests (request_id, coworker_name, description, status, created_at)
-            VALUES (%s, %s, %s, 'pending', %s)
+            INSERT INTO custom_requests (request_id, coworker_name, description, status, created_at, phone)
+            VALUES (%s, %s, %s, 'pending', %s, %s)
             """,
-            (request_id, coworker_name, custom_request_text, created_at),
+            (request_id, coworker_name, custom_request_text, created_at, phone),
         )
 
     db.commit()
@@ -482,6 +502,7 @@ def admin():
         groups[key] = {
             "request_id": first["request_id"],
             "coworker_name": first["coworker_name"],
+            "phone": first["phone"],
             "created_at": first["created_at"],
             "notes": first["notes"],
             "lines": items,
@@ -502,6 +523,7 @@ def admin():
             groups[key] = {
                 "request_id": row["request_id"],
                 "coworker_name": row["coworker_name"],
+                "phone": row["phone"],
                 "created_at": row["created_at"],
                 "notes": None,
                 "lines": [],
