@@ -25,6 +25,18 @@ STATUS_LABELS = {
     "rejected": "Rejeitado",
 }
 SIZES = ["XS", "S", "M", "L", "XL", "XXL", "XXXL"]
+CATEGORIES = [
+    "1ª Liga",
+    "La Liga",
+    "Ligue 1",
+    "Premier League",
+    "Bundesliga",
+    "Serie A",
+    "Internacional",
+    "Outros",
+    "Vintage",
+]
+KIT_TYPES = ["Casa", "Fora", "Alternativa", "Outro"]
 CUSTOM_REQUEST_STATUSES = ["pending", "answered", "rejected"]
 CUSTOM_REQUEST_STATUS_LABELS = {
     "pending": "Pendente",
@@ -83,11 +95,13 @@ def init_db():
                 created_at TEXT NOT NULL,
                 request_id TEXT,
                 supplier_order_id INTEGER,
-                is_custom INTEGER NOT NULL DEFAULT 0
+                is_custom INTEGER NOT NULL DEFAULT 0,
+                kit_type TEXT
             )
             """
         )
         db.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS is_custom INTEGER NOT NULL DEFAULT 0")
+        db.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS kit_type TEXT")
         db.execute(
             """
             CREATE TABLE IF NOT EXISTS catalog_items (
@@ -97,10 +111,14 @@ def init_db():
                 price TEXT,
                 available INTEGER NOT NULL DEFAULT 1,
                 created_at TEXT NOT NULL,
-                image_url TEXT
+                image_url TEXT,
+                category TEXT,
+                kit_types TEXT
             )
             """
         )
+        db.execute("ALTER TABLE catalog_items ADD COLUMN IF NOT EXISTS category TEXT")
+        db.execute("ALTER TABLE catalog_items ADD COLUMN IF NOT EXISTS kit_types TEXT")
         db.execute(
             """
             CREATE TABLE IF NOT EXISTS supplier_orders (
@@ -182,7 +200,7 @@ def image_src(image_url):
 def index():
     db = get_db()
     catalog = db.execute(
-        "SELECT * FROM catalog_items WHERE available = 1 ORDER BY name ASC"
+        "SELECT * FROM catalog_items WHERE available = 1 ORDER BY category ASC NULLS LAST, name ASC"
     ).fetchall()
     return render_template("index.html", catalog=catalog)
 
@@ -193,18 +211,20 @@ def create_order():
     notes = request.form.get("notes", "").strip()
     custom_request_text = request.form.get("custom_request", "").strip()
     item_names = request.form.getlist("item_description[]")
+    kit_types = request.form.getlist("kit_type[]")
     sizes = request.form.getlist("size[]")
     quantities = request.form.getlist("quantity[]")
 
     db = get_db()
     catalog = db.execute(
-        "SELECT * FROM catalog_items WHERE available = 1 ORDER BY name ASC"
+        "SELECT * FROM catalog_items WHERE available = 1 ORDER BY category ASC NULLS LAST, name ASC"
     ).fetchall()
     catalog_by_name = {c["name"]: c for c in catalog}
 
     line_items = []
     for i, raw_name in enumerate(item_names):
         name = raw_name.strip()
+        kit_type = kit_types[i].strip() if i < len(kit_types) else ""
         size = sizes[i].strip() if i < len(sizes) else ""
         if not name and not size:
             continue
@@ -218,6 +238,15 @@ def create_order():
                     error="Um dos artigos ou tamanhos não é válido — volta a escolher da lista.",
                     catalog=catalog,
                 )
+            valid_kit_types = [k.strip() for k in (matched_item["kit_types"] or "").split(",") if k.strip()]
+            if valid_kit_types and kit_type not in valid_kit_types:
+                return render_template(
+                    "index.html",
+                    error="Um dos tipos de camisola não é válido — volta a escolher da lista.",
+                    catalog=catalog,
+                )
+            if not valid_kit_types:
+                kit_type = ""
             is_custom = False
         else:
             if not name or not size:
@@ -226,6 +255,7 @@ def create_order():
                     error="Preenche o nome e o tamanho do artigo personalizado.",
                     catalog=catalog,
                 )
+            kit_type = ""
             is_custom = True
 
         try:
@@ -233,7 +263,7 @@ def create_order():
         except ValueError:
             quantity = 1
 
-        line_items.append((name, size, quantity, is_custom))
+        line_items.append((name, kit_type, size, quantity, is_custom))
 
     if not coworker_name or (not line_items and not custom_request_text):
         return render_template(
@@ -244,13 +274,13 @@ def create_order():
 
     request_id = uuid.uuid4().hex[:8]
     created_at = datetime.now().isoformat(timespec="seconds")
-    for name, size, quantity, is_custom in line_items:
+    for name, kit_type, size, quantity, is_custom in line_items:
         db.execute(
             """
-            INSERT INTO orders (coworker_name, item_description, size, quantity, notes, status, created_at, request_id, is_custom)
-            VALUES (%s, %s, %s, %s, %s, 'pending', %s, %s, %s)
+            INSERT INTO orders (coworker_name, item_description, kit_type, size, quantity, notes, status, created_at, request_id, is_custom)
+            VALUES (%s, %s, %s, %s, %s, %s, 'pending', %s, %s, %s)
             """,
-            (coworker_name, name, size, quantity, notes, created_at, request_id, 1 if is_custom else 0),
+            (coworker_name, name, kit_type or None, size, quantity, notes, created_at, request_id, 1 if is_custom else 0),
         )
 
     if custom_request_text:
@@ -378,7 +408,7 @@ def admin():
             }
         )
 
-    catalog = db.execute("SELECT * FROM catalog_items ORDER BY name ASC").fetchall()
+    catalog = db.execute("SELECT * FROM catalog_items ORDER BY category ASC NULLS LAST, name ASC").fetchall()
     return render_template(
         "admin.html",
         order_groups=order_groups,
@@ -386,6 +416,8 @@ def admin():
         status_labels=STATUS_LABELS,
         catalog=catalog,
         sizes=SIZES,
+        categories=CATEGORIES,
+        kit_types=KIT_TYPES,
         supplier_orders=supplier_orders,
         custom_request_statuses=CUSTOM_REQUEST_STATUSES,
         custom_request_status_labels=CUSTOM_REQUEST_STATUS_LABELS,
@@ -404,19 +436,21 @@ def bulk_add_catalog_items():
             continue
 
         parts = [p.strip() for p in line.split("|")]
-        name = parts[0] if parts else ""
+        category = parts[0] if parts and parts[0] in CATEGORIES else ""
+        name = parts[1] if len(parts) > 1 else ""
         if not name:
             continue
 
-        sizes = [s.strip() for s in parts[1].split(",") if s.strip() in SIZES] if len(parts) > 1 else []
-        price = parts[2] if len(parts) > 2 else ""
+        kit_types = [k.strip() for k in parts[2].split(",") if k.strip() in KIT_TYPES] if len(parts) > 2 else []
+        sizes = [s.strip() for s in parts[3].split(",") if s.strip() in SIZES] if len(parts) > 3 else []
+        price = parts[4] if len(parts) > 4 else ""
 
         db.execute(
             """
-            INSERT INTO catalog_items (name, size, price, available, created_at)
-            VALUES (%s, %s, %s, 1, %s)
+            INSERT INTO catalog_items (name, size, price, available, created_at, category, kit_types)
+            VALUES (%s, %s, %s, 1, %s, %s, %s)
             """,
-            (name, ", ".join(sizes), price, created_at),
+            (name, ", ".join(sizes), price, created_at, category or None, ", ".join(kit_types)),
         )
     db.commit()
 
@@ -426,6 +460,8 @@ def bulk_add_catalog_items():
 @app.route("/admin/catalog/add", methods=["POST"])
 def add_catalog_item():
     name = request.form.get("name", "").strip()
+    category = request.form.get("category", "").strip()
+    kit_types = [k for k in request.form.getlist("kit_types") if k in KIT_TYPES]
     sizes = [s for s in request.form.getlist("sizes") if s in SIZES]
     price = request.form.get("price", "").strip()
     image_url = save_uploaded_image(request.files.get("image"))
@@ -434,10 +470,18 @@ def add_catalog_item():
         db = get_db()
         db.execute(
             """
-            INSERT INTO catalog_items (name, size, price, available, created_at, image_url)
-            VALUES (%s, %s, %s, 1, %s, %s)
+            INSERT INTO catalog_items (name, size, price, available, created_at, image_url, category, kit_types)
+            VALUES (%s, %s, %s, 1, %s, %s, %s, %s)
             """,
-            (name, ", ".join(sizes), price, datetime.now().isoformat(timespec="seconds"), image_url),
+            (
+                name,
+                ", ".join(sizes),
+                price,
+                datetime.now().isoformat(timespec="seconds"),
+                image_url,
+                category or None,
+                ", ".join(kit_types),
+            ),
         )
         db.commit()
 
@@ -447,6 +491,8 @@ def add_catalog_item():
 @app.route("/admin/catalog/update/<int:item_id>", methods=["POST"])
 def update_catalog_item(item_id):
     name = request.form.get("name", "").strip()
+    category = request.form.get("category", "").strip()
+    kit_types = [k for k in request.form.getlist("kit_types") if k in KIT_TYPES]
     sizes = [s for s in request.form.getlist("sizes") if s in SIZES]
     price = request.form.get("price", "").strip()
     available = 1 if request.form.get("available") == "on" else 0
@@ -457,8 +503,12 @@ def update_catalog_item(item_id):
     image_url = new_image or (existing["image_url"] if existing else None)
 
     db.execute(
-        "UPDATE catalog_items SET name = %s, size = %s, price = %s, available = %s, image_url = %s WHERE id = %s",
-        (name, ", ".join(sizes), price, available, image_url, item_id),
+        """
+        UPDATE catalog_items
+        SET name = %s, size = %s, price = %s, available = %s, image_url = %s, category = %s, kit_types = %s
+        WHERE id = %s
+        """,
+        (name, ", ".join(sizes), price, available, image_url, category or None, ", ".join(kit_types), item_id),
     )
     db.commit()
     return redirect(url_for("admin"))
