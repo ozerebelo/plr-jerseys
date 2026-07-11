@@ -105,7 +105,8 @@ def init_db():
                 is_custom INTEGER NOT NULL DEFAULT 0,
                 kit_type TEXT,
                 season TEXT,
-                personalization TEXT
+                personalization TEXT,
+                item_note TEXT
             )
             """
         )
@@ -113,6 +114,7 @@ def init_db():
         db.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS kit_type TEXT")
         db.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS season TEXT")
         db.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS personalization TEXT")
+        db.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS item_note TEXT")
         db.execute(
             """
             CREATE TABLE IF NOT EXISTS catalog_items (
@@ -305,6 +307,7 @@ def create_order():
     quantities = request.form.getlist("quantity[]")
     personalize_flags = request.form.getlist("personalize[]")
     personalize_texts = request.form.getlist("personalize_text[]")
+    item_notes = request.form.getlist("item_note[]")
 
     db = get_db()
     catalog = enrich_catalog_items(
@@ -325,6 +328,7 @@ def create_order():
         personalization = personalize_texts[i].strip() if i < len(personalize_texts) else ""
         if not personalized:
             personalization = ""
+        item_note = item_notes[i].strip() if i < len(item_notes) else ""
         if not name and not size:
             continue
 
@@ -363,6 +367,14 @@ def create_order():
                     error="Escreve o nome/número a personalizar, ou desmarca a personalização.",
                     catalog=catalog,
                 )
+            if matched_item["category"] == "Vintage" and not item_note:
+                return render_template(
+                    "index.html",
+                    error="Escreve o que procuras no artigo Vintage (equipa, ano, jogador...).",
+                    catalog=catalog,
+                )
+            if matched_item["category"] != "Vintage":
+                item_note = ""
             base_price = VINTAGE_PRICE if matched_item["category"] == "Vintage" else BASE_PRICE
             price = base_price + (PERSONALIZATION_PRICE if personalized else 0)
             price_str = f"{price:.2f}€"
@@ -378,13 +390,14 @@ def create_order():
             kit_type = ""
             price_str = None
             is_custom = True
+            item_note = ""
 
         try:
             quantity = max(1, int(quantities[i].strip())) if i < len(quantities) else 1
         except ValueError:
             quantity = 1
 
-        line_items.append((name, season, kit_type, size, quantity, is_custom, price_str, personalization))
+        line_items.append((name, season, kit_type, size, quantity, is_custom, price_str, personalization, item_note))
 
     if not coworker_name or (not line_items and not custom_request_text):
         return render_template(
@@ -395,13 +408,13 @@ def create_order():
 
     request_id = uuid.uuid4().hex[:8]
     created_at = datetime.now().isoformat(timespec="seconds")
-    for name, season, kit_type, size, quantity, is_custom, price_str, personalization in line_items:
+    for name, season, kit_type, size, quantity, is_custom, price_str, personalization, item_note in line_items:
         db.execute(
             """
             INSERT INTO orders
                 (coworker_name, item_description, season, kit_type, size, quantity, notes, status,
-                 price, created_at, request_id, is_custom, personalization)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, 'pending', %s, %s, %s, %s, %s)
+                 price, created_at, request_id, is_custom, personalization, item_note)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, 'pending', %s, %s, %s, %s, %s, %s)
             """,
             (
                 coworker_name,
@@ -416,6 +429,7 @@ def create_order():
                 request_id,
                 1 if is_custom else 0,
                 personalization or None,
+                item_note or None,
             ),
         )
 

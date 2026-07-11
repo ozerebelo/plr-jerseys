@@ -266,7 +266,7 @@
           <tbody>
             {% for order in group.lines %}
             <tr>
-              <td>{{ order.item_description }}{% if order.is_custom %} <span class="badge-custom">Fora do catálogo</span>{% endif %}</td>
+              <td>{{ order.item_description }}{% if order.is_custom %} <span class="badge-custom">Fora do catálogo</span>{% endif %}{% if order.item_note %}<div class="muted-text">{{ order.item_note }}</div>{% endif %}</td>
               <td>{{ order.season or "—" }}</td>
               <td>{{ order.kit_type or "—" }}</td>
               <td>{{ order.size }}</td>

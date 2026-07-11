@@ -43,7 +43,7 @@
                 {% for category, items in catalog|groupby('category') %}
                 <optgroup label="{{ category or 'Outros' }}">
                   {% for item in items %}
-                  <option value="{{ item.name }}" data-seasons="{{ item.seasons or '' }}" data-kit-types="{{ item.kit_types or '' }}" data-sizes="{{ item.size or '' }}" data-image="{{ image_src(item.image_url) or '' }}" data-images='{{ item.variant_images | tojson }}'>{{ item.name }} — {{ item.display_price }}</option>
+                  <option value="{{ item.name }}" data-category="{{ item.category or '' }}" data-seasons="{{ item.seasons or '' }}" data-kit-types="{{ item.kit_types or '' }}" data-sizes="{{ item.size or '' }}" data-image="{{ image_src(item.image_url) or '' }}" data-images='{{ item.variant_images | tojson }}'>{{ item.name }} — {{ item.display_price }}</option>
                   {% endfor %}
                 </optgroup>
                 {% endfor %}
@@ -66,6 +66,10 @@
             <input type="number" name="quantity[]" min="1" value="1" class="qty-input">
             <button type="button" class="remove-item-btn" onclick="removeLineItem(this)">&times;</button>
             <img class="item-preview" alt="">
+            <div class="vintage-note-field" style="display:none;">
+              <label class="vintage-note-label">Vintage — o que procuras? (equipa, ano, jogador...)</label>
+              <input type="text" name="item_note[]" class="vintage-note-input" placeholder="ex: Brasil 1994, camisola do Ronaldinho">
+            </div>
             <div class="personalize-field">
               <label class="personalize-check">
                 <input type="checkbox" class="personalize-checkbox" onchange="togglePersonalize(this)">
@@ -142,10 +146,12 @@
 
         preview.removeAttribute('src');
         preview.style.display = 'none';
+        updateVintageNoteField(row, false);
         return;
       }
 
       const selected = selectEl.options[selectEl.selectedIndex];
+      updateVintageNoteField(row, selected.dataset.category === 'Vintage');
 
       const seasons = (selected.dataset.seasons || '')
         .split(',')
@@ -181,6 +187,19 @@
       });
 
       updatePreviewImage(selectEl);
+    }
+
+    function updateVintageNoteField(row, isVintage) {
+      const field = row.querySelector('.vintage-note-field');
+      const input = row.querySelector('.vintage-note-input');
+      if (isVintage) {
+        field.style.display = 'flex';
+        input.required = true;
+      } else {
+        field.style.display = 'none';
+        input.required = false;
+        input.value = '';
+      }
     }
 
     function updatePreviewImage(selectEl) {
@@ -272,6 +291,7 @@
       row.querySelector('.qty-input').value = 1;
       preview.removeAttribute('src');
       preview.style.display = 'none';
+      updateVintageNoteField(row, false);
     }
 
     function addLineItem() {
