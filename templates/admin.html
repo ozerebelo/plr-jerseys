@@ -3,11 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Administração de Encomendas</title>
+  <title>PLR-Jerseys — Administração</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
   <div class="container wide">
+    <header class="site-header">
+      <a class="brand" href="{{ url_for('index') }}"><span class="brand-mark">PLR</span><span class="brand-rest">-Jerseys</span></a>
+      <span class="brand-tagline">Administração</span>
+    </header>
     <h1>Catálogo</h1>
     <p class="subtitle">O que os colegas veem como "disponível" no formulário de encomenda. Adiciona artigos que confirmaste com o fornecedor; desativa quando esgotar.</p>
     <p class="muted-text" style="margin-top: -14px; margin-bottom: 16px;">

@@ -2,9 +2,12 @@
   --bg: #0f172a;
   --card: #1e293b;
   --accent: #22c55e;
+  --accent-dark: #16a34a;
+  --accent-2: #eab308;
   --text: #e2e8f0;
   --muted: #94a3b8;
   --border: #334155;
+  --font-display: 'Oswald', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 * {
@@ -14,7 +17,9 @@
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background: var(--bg);
+  background:
+    linear-gradient(90deg, rgba(34, 197, 94, 0.05) 0%, transparent 4%),
+    var(--bg);
   color: var(--text);
   padding: 24px;
 }
@@ -28,9 +33,61 @@ body {
   max-width: 1000px;
 }
 
+.site-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 12px;
+  margin-bottom: 20px;
+  border-bottom: 3px solid var(--accent);
+  position: relative;
+}
+
+.site-header::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -3px;
+  width: 56px;
+  height: 3px;
+  background: var(--accent-2);
+}
+
+.brand {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 26px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+}
+
+.brand-mark {
+  color: var(--accent);
+}
+
+.brand-rest {
+  color: var(--text);
+}
+
+.brand-tagline {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
 h1 {
+  font-family: var(--font-display);
   font-size: 22px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
   margin-bottom: 4px;
+  padding-left: 12px;
+  border-left: 4px solid var(--accent);
 }
 
 p.subtitle {
@@ -50,7 +107,8 @@ p.subtitle {
 .card {
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-top: 3px solid var(--accent);
+  border-radius: 8px;
   padding: 20px;
   margin-bottom: 16px;
 }
@@ -84,14 +142,18 @@ textarea {
 
 button {
   margin-top: 18px;
-  background: var(--accent);
+  background: linear-gradient(180deg, var(--accent) 0%, var(--accent-dark) 100%);
   color: #052e16;
   border: none;
+  border-bottom: 3px solid var(--accent-2);
   padding: 10px 18px;
   border-radius: 6px;
+  font-family: var(--font-display);
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 button:hover {
@@ -141,7 +203,9 @@ th {
   padding: 3px 8px;
   border-radius: 999px;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 
 .badge.pending { background: #422006; color: #fbbf24; }
@@ -156,7 +220,9 @@ th {
   padding: 2px 7px;
   border-radius: 999px;
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
   background: #422006;
   color: #fbbf24;
   white-space: nowrap;
