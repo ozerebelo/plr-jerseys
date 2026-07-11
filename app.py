@@ -242,6 +242,7 @@ def enrich_catalog_items(db, catalog_rows):
     items = []
     for row in catalog_rows:
         item = dict(row)
+        item["category"] = item["category"] or ""
         price = VINTAGE_PRICE if item["category"] == "Vintage" else BASE_PRICE
         item["display_price"] = f"{price:.0f}€"
         item["variant_images"] = variants_by_item.get(item["id"], {})
