@@ -43,7 +43,7 @@
                 {% for category, items in catalog|groupby('category') %}
                 <optgroup label="{{ category or 'Outros' }}">
                   {% for item in items %}
-                  <option value="{{ item.name }}" data-seasons="{{ item.seasons or '' }}" data-kit-types="{{ item.kit_types or '' }}" data-sizes="{{ item.size or '' }}" data-image="{{ image_src(item.image_url) or '' }}">{{ item.name }}{% if item.price %} — {{ item.price }}{% endif %}</option>
+                  <option value="{{ item.name }}" data-seasons="{{ item.seasons or '' }}" data-kit-types="{{ item.kit_types or '' }}" data-sizes="{{ item.size or '' }}" data-image="{{ image_src(item.image_url) or '' }}">{{ item.name }} — {{ item.display_price }}</option>
                   {% endfor %}
                 </optgroup>
                 {% endfor %}
@@ -66,6 +66,14 @@
             <input type="number" name="quantity[]" min="1" value="1" class="qty-input">
             <button type="button" class="remove-item-btn" onclick="removeLineItem(this)">&times;</button>
             <img class="item-preview" alt="">
+            <div class="personalize-field">
+              <label class="personalize-check">
+                <input type="checkbox" class="personalize-checkbox" onchange="togglePersonalize(this)">
+                Personalizar (nome/número/logos, +2,50€)
+              </label>
+              <input type="hidden" name="personalize[]" class="personalize-flag" value="">
+              <input type="text" name="personalize_text[]" class="personalize-text" placeholder="ex: Ronaldo 7" style="display:none;">
+            </div>
           </div>
         </div>
         <button type="button" class="add-item-btn" onclick="addLineItem()">+ Adicionar outro artigo</button>
@@ -75,7 +83,7 @@
         <textarea id="custom_request" name="custom_request" placeholder="ex: Tens tamanhos de criança?"></textarea>
 
         <label for="notes">Notas (opcional)</label>
-        <textarea id="notes" name="notes" placeholder="Nome/número nas costas, manga comprida, etc."></textarea>
+        <textarea id="notes" name="notes" placeholder="Entrega urgente, outras instruções, etc."></textarea>
 
         <button type="submit">Enviar Pedido</button>
       </form>
@@ -181,6 +189,23 @@
       }
     }
 
+    function togglePersonalize(checkbox) {
+      const row = checkbox.closest('.line-item');
+      const flag = row.querySelector('.personalize-flag');
+      const text = row.querySelector('.personalize-text');
+      if (checkbox.checked) {
+        flag.value = '1';
+        text.style.display = 'block';
+        text.required = true;
+        text.focus();
+      } else {
+        flag.value = '';
+        text.style.display = 'none';
+        text.required = false;
+        text.value = '';
+      }
+    }
+
     function resetLineItem(row) {
       const itemSelect = row.querySelector('.item-select');
       const itemCustomInput = row.querySelector('.item-custom-input');
@@ -189,6 +214,15 @@
       const sizeSelect = row.querySelector('.size-select');
       const sizeCustomInput = row.querySelector('.size-custom-input');
       const preview = row.querySelector('.item-preview');
+      const personalizeCheckbox = row.querySelector('.personalize-checkbox');
+      const personalizeFlag = row.querySelector('.personalize-flag');
+      const personalizeText = row.querySelector('.personalize-text');
+
+      personalizeCheckbox.checked = false;
+      personalizeFlag.value = '';
+      personalizeText.value = '';
+      personalizeText.required = false;
+      personalizeText.style.display = 'none';
 
       itemSelect.selectedIndex = 0;
       itemSelect.disabled = false;

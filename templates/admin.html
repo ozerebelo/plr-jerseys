@@ -10,6 +10,9 @@
   <div class="container wide">
     <h1>Catálogo</h1>
     <p class="subtitle">O que os colegas veem como "disponível" no formulário de encomenda. Adiciona artigos que confirmaste com o fornecedor; desativa quando esgotar.</p>
+    <p class="muted-text" style="margin-top: -14px; margin-bottom: 16px;">
+      Preços fixos: {{ '%.0f'|format(base_price) }}€ normal, {{ '%.0f'|format(vintage_price) }}€ Vintage, personalização +{{ ('%.2f'|format(personalization_price)).replace('.', ',') }}€ &mdash; calculados automaticamente, sem precisares de definir preço por artigo.
+    </p>
 
     <div class="card" style="overflow-x: auto;">
       <table>
@@ -21,7 +24,6 @@
             <th>Temporadas</th>
             <th>Tipos</th>
             <th>Tamanho</th>
-            <th>Preço</th>
             <th>Disponível</th>
             <th></th>
           </tr>
@@ -70,7 +72,6 @@
                 {% endfor %}
               </div>
             </td>
-            <td><input type="text" name="price" form="catalog-form-{{ item.id }}" value="{{ item.price or '' }}"></td>
             <td><input type="checkbox" name="available" form="catalog-form-{{ item.id }}" {% if item.available %}checked{% endif %}></td>
             <td>
               <form id="catalog-form-{{ item.id }}" method="POST" action="{{ url_for('update_catalog_item', item_id=item.id) }}" enctype="multipart/form-data" style="display:inline;">
@@ -83,7 +84,7 @@
           </tr>
           {% else %}
           <tr>
-            <td colspan="9" style="color: var(--muted);">Ainda não há artigos no catálogo.</td>
+            <td colspan="8" style="color: var(--muted);">Ainda não há artigos no catálogo.</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -113,7 +114,6 @@
             <label class="size-check"><input type="checkbox" name="sizes" value="{{ s }}">{{ s }}</label>
             {% endfor %}
           </div>
-          <input type="text" name="price" placeholder="Preço">
           <input type="file" name="image" accept="image/*">
           <button type="submit">Adicionar artigo</button>
         </div>
@@ -122,8 +122,8 @@
       <details class="bulk-add">
         <summary>Adicionar vários artigos de uma vez</summary>
         <form method="POST" action="{{ url_for('bulk_add_catalog_items') }}">
-          <label for="bulk_text">Um artigo por linha: <code>Categoria | Nome | Temporadas | Tipos | Tamanhos | Preço</code> &mdash; categoria deve ser uma das da lista ({{ categories | join(', ') }}); temporadas ({{ seasons | join(', ') }}), tipos ({{ kit_types | join(', ') }}), tamanhos e preço são opcionais. Adiciona imagens depois na tabela acima.</label>
-          <textarea id="bulk_text" name="bulk_text" rows="6" placeholder="La Liga | Real Madrid | {{ seasons[0] }} | Casa, Fora | M, L, XL | 25&#10;Premier League | Manchester City | {{ seasons[0] }} | Casa | S, M, L&#10;Vintage | Brasil 1994 | {{ seasons[1] }}"></textarea>
+          <label for="bulk_text">Um artigo por linha: <code>Categoria | Nome | Temporadas | Tipos | Tamanhos</code> &mdash; categoria deve ser uma das da lista ({{ categories | join(', ') }}); temporadas ({{ seasons | join(', ') }}), tipos ({{ kit_types | join(', ') }}) e tamanhos são opcionais. Adiciona imagens depois na tabela acima.</label>
+          <textarea id="bulk_text" name="bulk_text" rows="6" placeholder="La Liga | Real Madrid | {{ seasons[0] }} | Casa, Fora | M, L, XL&#10;Premier League | Manchester City | {{ seasons[0] }} | Casa | S, M, L&#10;Vintage | Brasil 1994 | {{ seasons[1] }}"></textarea>
           <button type="submit">Importar linhas</button>
         </form>
       </details>
@@ -225,6 +225,7 @@
               <th>Tipo</th>
               <th>Tamanho</th>
               <th>Qtd</th>
+              <th>Personalização</th>
               <th>Estado</th>
               <th>Venda</th>
               <th>Custo</th>
@@ -236,11 +237,12 @@
           <tbody>
             {% for order in group.lines %}
             <tr>
-              <td>{{ order.item_description }}{% if order.is_custom %} <span class="badge-custom">Personalizado</span>{% endif %}</td>
+              <td>{{ order.item_description }}{% if order.is_custom %} <span class="badge-custom">Fora do catálogo</span>{% endif %}</td>
               <td>{{ order.season or "—" }}</td>
               <td>{{ order.kit_type or "—" }}</td>
               <td>{{ order.size }}</td>
               <td>{{ order.quantity }}</td>
+              <td>{{ order.personalization or "—" }}</td>
               <td>
                 <select name="status" form="order-form-{{ order.id }}">
                   {% for s in statuses %}
