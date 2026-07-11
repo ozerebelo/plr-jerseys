@@ -18,6 +18,7 @@
             <th>Imagem</th>
             <th>Categoria</th>
             <th>Artigo</th>
+            <th>Temporadas</th>
             <th>Tipos</th>
             <th>Tamanho</th>
             <th>Preço</th>
@@ -29,6 +30,7 @@
           {% for item in catalog %}
           {% set item_sizes = (item.size or '').split(',') | map('trim') | list %}
           {% set item_kit_types = (item.kit_types or '').split(',') | map('trim') | list %}
+          {% set item_seasons = (item.seasons or '').split(',') | map('trim') | list %}
           <tr>
             <td>
               {% if item.image_url %}
@@ -47,6 +49,13 @@
               </select>
             </td>
             <td><input type="text" name="name" form="catalog-form-{{ item.id }}" value="{{ item.name }}" required></td>
+            <td>
+              <div class="size-checks">
+                {% for s in seasons %}
+                <label class="size-check"><input type="checkbox" name="seasons" form="catalog-form-{{ item.id }}" value="{{ s }}" {% if s in item_seasons %}checked{% endif %}>{{ s }}</label>
+                {% endfor %}
+              </div>
+            </td>
             <td>
               <div class="size-checks">
                 {% for k in kit_types %}
@@ -74,7 +83,7 @@
           </tr>
           {% else %}
           <tr>
-            <td colspan="8" style="color: var(--muted);">Ainda não há artigos no catálogo.</td>
+            <td colspan="9" style="color: var(--muted);">Ainda não há artigos no catálogo.</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -89,6 +98,11 @@
             {% endfor %}
           </select>
           <input type="text" name="name" placeholder="Nome do artigo" required>
+          <div class="size-checks">
+            {% for s in seasons %}
+            <label class="size-check"><input type="checkbox" name="seasons" value="{{ s }}">{{ s }}</label>
+            {% endfor %}
+          </div>
           <div class="size-checks">
             {% for k in kit_types %}
             <label class="size-check"><input type="checkbox" name="kit_types" value="{{ k }}">{{ k }}</label>
@@ -108,8 +122,8 @@
       <details class="bulk-add">
         <summary>Adicionar vários artigos de uma vez</summary>
         <form method="POST" action="{{ url_for('bulk_add_catalog_items') }}">
-          <label for="bulk_text">Um artigo por linha: <code>Categoria | Nome | Tipos | Tamanhos | Preço</code> &mdash; categoria deve ser uma das da lista ({{ categories | join(', ') }}); tipos ({{ kit_types | join(', ') }}), tamanhos e preço são opcionais. Adiciona imagens depois na tabela acima.</label>
-          <textarea id="bulk_text" name="bulk_text" rows="6" placeholder="La Liga | Real Madrid | Casa, Fora | M, L, XL | 25&#10;Premier League | Manchester City | Casa | S, M, L&#10;Vintage | Brasil 1994"></textarea>
+          <label for="bulk_text">Um artigo por linha: <code>Categoria | Nome | Temporadas | Tipos | Tamanhos | Preço</code> &mdash; categoria deve ser uma das da lista ({{ categories | join(', ') }}); temporadas ({{ seasons | join(', ') }}), tipos ({{ kit_types | join(', ') }}), tamanhos e preço são opcionais. Adiciona imagens depois na tabela acima.</label>
+          <textarea id="bulk_text" name="bulk_text" rows="6" placeholder="La Liga | Real Madrid | {{ seasons[0] }} | Casa, Fora | M, L, XL | 25&#10;Premier League | Manchester City | {{ seasons[0] }} | Casa | S, M, L&#10;Vintage | Brasil 1994 | {{ seasons[1] }}"></textarea>
           <button type="submit">Importar linhas</button>
         </form>
       </details>
@@ -147,13 +161,14 @@
       <div style="overflow-x: auto;">
         <table>
           <thead>
-            <tr><th>Colega</th><th>Artigo</th><th>Tipo</th><th>Tamanho</th><th>Qtd</th><th>Venda</th><th>Custo</th></tr>
+            <tr><th>Colega</th><th>Artigo</th><th>Temporada</th><th>Tipo</th><th>Tamanho</th><th>Qtd</th><th>Venda</th><th>Custo</th></tr>
           </thead>
           <tbody>
             {% for o in so.linked %}
             <tr>
               <td>{{ o.coworker_name }}</td>
               <td>{{ o.item_description }}</td>
+              <td>{{ o.season or "—" }}</td>
               <td>{{ o.kit_type or "—" }}</td>
               <td>{{ o.size }}</td>
               <td>{{ o.quantity }}</td>
@@ -206,6 +221,7 @@
           <thead>
             <tr>
               <th>Artigo</th>
+              <th>Temporada</th>
               <th>Tipo</th>
               <th>Tamanho</th>
               <th>Qtd</th>
@@ -221,6 +237,7 @@
             {% for order in group.lines %}
             <tr>
               <td>{{ order.item_description }}{% if order.is_custom %} <span class="badge-custom">Personalizado</span>{% endif %}</td>
+              <td>{{ order.season or "—" }}</td>
               <td>{{ order.kit_type or "—" }}</td>
               <td>{{ order.size }}</td>
               <td>{{ order.quantity }}</td>

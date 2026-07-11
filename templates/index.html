@@ -29,6 +29,7 @@
         {% endif %}
         <div class="line-items-header">
           <span>Artigo</span>
+          <span>Temporada</span>
           <span>Tipo</span>
           <span>Tamanho</span>
           <span>Qtd</span>
@@ -42,7 +43,7 @@
                 {% for category, items in catalog|groupby('category') %}
                 <optgroup label="{{ category or 'Outros' }}">
                   {% for item in items %}
-                  <option value="{{ item.name }}" data-kit-types="{{ item.kit_types or '' }}" data-sizes="{{ item.size or '' }}" data-image="{{ image_src(item.image_url) or '' }}">{{ item.name }}{% if item.price %} — {{ item.price }}{% endif %}</option>
+                  <option value="{{ item.name }}" data-seasons="{{ item.seasons or '' }}" data-kit-types="{{ item.kit_types or '' }}" data-sizes="{{ item.size or '' }}" data-image="{{ image_src(item.image_url) or '' }}">{{ item.name }}{% if item.price %} — {{ item.price }}{% endif %}</option>
                   {% endfor %}
                 </optgroup>
                 {% endfor %}
@@ -50,6 +51,9 @@
               </select>
               <input type="text" name="item_description[]" class="item-custom-input" placeholder="Nome do artigo" disabled>
             </div>
+            <select name="season[]" class="season-select">
+              <option value="" disabled selected>Escolhe um artigo primeiro</option>
+            </select>
             <select name="kit_type[]" class="kit-select">
               <option value="" disabled selected>Escolhe um artigo primeiro</option>
             </select>
@@ -81,8 +85,32 @@
   </div>
 
   <script>
+    function populateOptionalSelect(selectEl, values, placeholderText) {
+      selectEl.innerHTML = '';
+      if (values.length) {
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.disabled = true;
+        placeholder.selected = true;
+        placeholder.textContent = placeholderText;
+        selectEl.appendChild(placeholder);
+        values.forEach(function (v) {
+          const opt = document.createElement('option');
+          opt.value = v;
+          opt.textContent = v;
+          selectEl.appendChild(opt);
+        });
+      } else {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = 'Não aplicável';
+        selectEl.appendChild(opt);
+      }
+    }
+
     function updateItemFields(selectEl) {
       const row = selectEl.closest('.line-item');
+      const seasonSelect = row.querySelector('.season-select');
       const kitSelect = row.querySelector('.kit-select');
       const sizeSelect = row.querySelector('.size-select');
       const sizeCustomInput = row.querySelector('.size-custom-input');
@@ -96,6 +124,7 @@
         itemCustomInput.style.display = 'block';
         itemCustomInput.focus();
 
+        seasonSelect.innerHTML = '<option value="">Não aplicável</option>';
         kitSelect.innerHTML = '<option value="">Não aplicável</option>';
 
         sizeSelect.disabled = true;
@@ -110,31 +139,17 @@
 
       const selected = selectEl.options[selectEl.selectedIndex];
 
+      const seasons = (selected.dataset.seasons || '')
+        .split(',')
+        .map(function (s) { return s.trim(); })
+        .filter(Boolean);
+      populateOptionalSelect(seasonSelect, seasons, 'Escolhe a temporada');
+
       const kitTypes = (selected.dataset.kitTypes || '')
         .split(',')
         .map(function (s) { return s.trim(); })
         .filter(Boolean);
-
-      kitSelect.innerHTML = '';
-      if (kitTypes.length) {
-        const kitPlaceholder = document.createElement('option');
-        kitPlaceholder.value = '';
-        kitPlaceholder.disabled = true;
-        kitPlaceholder.selected = true;
-        kitPlaceholder.textContent = 'Escolhe o tipo';
-        kitSelect.appendChild(kitPlaceholder);
-        kitTypes.forEach(function (k) {
-          const opt = document.createElement('option');
-          opt.value = k;
-          opt.textContent = k;
-          kitSelect.appendChild(opt);
-        });
-      } else {
-        const opt = document.createElement('option');
-        opt.value = '';
-        opt.textContent = 'Não aplicável';
-        kitSelect.appendChild(opt);
-      }
+      populateOptionalSelect(kitSelect, kitTypes, 'Escolhe o tipo');
 
       const sizes = (selected.dataset.sizes || '')
         .split(',')
@@ -169,6 +184,7 @@
     function resetLineItem(row) {
       const itemSelect = row.querySelector('.item-select');
       const itemCustomInput = row.querySelector('.item-custom-input');
+      const seasonSelect = row.querySelector('.season-select');
       const kitSelect = row.querySelector('.kit-select');
       const sizeSelect = row.querySelector('.size-select');
       const sizeCustomInput = row.querySelector('.size-custom-input');
@@ -180,6 +196,8 @@
       itemCustomInput.value = '';
       itemCustomInput.disabled = true;
       itemCustomInput.style.display = 'none';
+
+      seasonSelect.innerHTML = '<option value="" disabled selected>Escolhe um artigo primeiro</option>';
 
       kitSelect.innerHTML = '<option value="" disabled selected>Escolhe um artigo primeiro</option>';
 

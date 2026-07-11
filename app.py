@@ -37,6 +37,8 @@ CATEGORIES = [
     "Vintage",
 ]
 KIT_TYPES = ["Casa", "Fora", "Alternativa", "Outro"]
+_season_start_year = datetime.now().year if datetime.now().month >= 7 else datetime.now().year - 1
+SEASONS = [f"{_season_start_year - i}/{_season_start_year - i + 1}" for i in range(4)]
 CUSTOM_REQUEST_STATUSES = ["pending", "answered", "rejected"]
 CUSTOM_REQUEST_STATUS_LABELS = {
     "pending": "Pendente",
@@ -96,12 +98,14 @@ def init_db():
                 request_id TEXT,
                 supplier_order_id INTEGER,
                 is_custom INTEGER NOT NULL DEFAULT 0,
-                kit_type TEXT
+                kit_type TEXT,
+                season TEXT
             )
             """
         )
         db.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS is_custom INTEGER NOT NULL DEFAULT 0")
         db.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS kit_type TEXT")
+        db.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS season TEXT")
         db.execute(
             """
             CREATE TABLE IF NOT EXISTS catalog_items (
@@ -113,12 +117,14 @@ def init_db():
                 created_at TEXT NOT NULL,
                 image_url TEXT,
                 category TEXT,
-                kit_types TEXT
+                kit_types TEXT,
+                seasons TEXT
             )
             """
         )
         db.execute("ALTER TABLE catalog_items ADD COLUMN IF NOT EXISTS category TEXT")
         db.execute("ALTER TABLE catalog_items ADD COLUMN IF NOT EXISTS kit_types TEXT")
+        db.execute("ALTER TABLE catalog_items ADD COLUMN IF NOT EXISTS seasons TEXT")
         db.execute(
             """
             CREATE TABLE IF NOT EXISTS supplier_orders (
@@ -211,6 +217,7 @@ def create_order():
     notes = request.form.get("notes", "").strip()
     custom_request_text = request.form.get("custom_request", "").strip()
     item_names = request.form.getlist("item_description[]")
+    seasons = request.form.getlist("season[]")
     kit_types = request.form.getlist("kit_type[]")
     sizes = request.form.getlist("size[]")
     quantities = request.form.getlist("quantity[]")
@@ -224,6 +231,7 @@ def create_order():
     line_items = []
     for i, raw_name in enumerate(item_names):
         name = raw_name.strip()
+        season = seasons[i].strip() if i < len(seasons) else ""
         kit_type = kit_types[i].strip() if i < len(kit_types) else ""
         size = sizes[i].strip() if i < len(sizes) else ""
         if not name and not size:
@@ -247,6 +255,15 @@ def create_order():
                 )
             if not valid_kit_types:
                 kit_type = ""
+            valid_seasons = [s.strip() for s in (matched_item["seasons"] or "").split(",") if s.strip()]
+            if valid_seasons and season not in valid_seasons:
+                return render_template(
+                    "index.html",
+                    error="Uma das temporadas não é válida — volta a escolher da lista.",
+                    catalog=catalog,
+                )
+            if not valid_seasons:
+                season = ""
             is_custom = False
         else:
             if not name or not size:
@@ -255,6 +272,7 @@ def create_order():
                     error="Preenche o nome e o tamanho do artigo personalizado.",
                     catalog=catalog,
                 )
+            season = ""
             kit_type = ""
             is_custom = True
 
@@ -263,7 +281,7 @@ def create_order():
         except ValueError:
             quantity = 1
 
-        line_items.append((name, kit_type, size, quantity, is_custom))
+        line_items.append((name, season, kit_type, size, quantity, is_custom))
 
     if not coworker_name or (not line_items and not custom_request_text):
         return render_template(
@@ -274,13 +292,24 @@ def create_order():
 
     request_id = uuid.uuid4().hex[:8]
     created_at = datetime.now().isoformat(timespec="seconds")
-    for name, kit_type, size, quantity, is_custom in line_items:
+    for name, season, kit_type, size, quantity, is_custom in line_items:
         db.execute(
             """
-            INSERT INTO orders (coworker_name, item_description, kit_type, size, quantity, notes, status, created_at, request_id, is_custom)
-            VALUES (%s, %s, %s, %s, %s, %s, 'pending', %s, %s, %s)
+            INSERT INTO orders (coworker_name, item_description, season, kit_type, size, quantity, notes, status, created_at, request_id, is_custom)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, 'pending', %s, %s, %s)
             """,
-            (coworker_name, name, kit_type or None, size, quantity, notes, created_at, request_id, 1 if is_custom else 0),
+            (
+                coworker_name,
+                name,
+                season or None,
+                kit_type or None,
+                size,
+                quantity,
+                notes,
+                created_at,
+                request_id,
+                1 if is_custom else 0,
+            ),
         )
 
     if custom_request_text:
@@ -418,6 +447,7 @@ def admin():
         sizes=SIZES,
         categories=CATEGORIES,
         kit_types=KIT_TYPES,
+        seasons=SEASONS,
         supplier_orders=supplier_orders,
         custom_request_statuses=CUSTOM_REQUEST_STATUSES,
         custom_request_status_labels=CUSTOM_REQUEST_STATUS_LABELS,
@@ -441,16 +471,17 @@ def bulk_add_catalog_items():
         if not name:
             continue
 
-        kit_types = [k.strip() for k in parts[2].split(",") if k.strip() in KIT_TYPES] if len(parts) > 2 else []
-        sizes = [s.strip() for s in parts[3].split(",") if s.strip() in SIZES] if len(parts) > 3 else []
-        price = parts[4] if len(parts) > 4 else ""
+        seasons = [s.strip() for s in parts[2].split(",") if s.strip() in SEASONS] if len(parts) > 2 else []
+        kit_types = [k.strip() for k in parts[3].split(",") if k.strip() in KIT_TYPES] if len(parts) > 3 else []
+        sizes = [s.strip() for s in parts[4].split(",") if s.strip() in SIZES] if len(parts) > 4 else []
+        price = parts[5] if len(parts) > 5 else ""
 
         db.execute(
             """
-            INSERT INTO catalog_items (name, size, price, available, created_at, category, kit_types)
-            VALUES (%s, %s, %s, 1, %s, %s, %s)
+            INSERT INTO catalog_items (name, size, price, available, created_at, category, kit_types, seasons)
+            VALUES (%s, %s, %s, 1, %s, %s, %s, %s)
             """,
-            (name, ", ".join(sizes), price, created_at, category or None, ", ".join(kit_types)),
+            (name, ", ".join(sizes), price, created_at, category or None, ", ".join(kit_types), ", ".join(seasons)),
         )
     db.commit()
 
@@ -461,6 +492,7 @@ def bulk_add_catalog_items():
 def add_catalog_item():
     name = request.form.get("name", "").strip()
     category = request.form.get("category", "").strip()
+    seasons = [s for s in request.form.getlist("seasons") if s in SEASONS]
     kit_types = [k for k in request.form.getlist("kit_types") if k in KIT_TYPES]
     sizes = [s for s in request.form.getlist("sizes") if s in SIZES]
     price = request.form.get("price", "").strip()
@@ -470,8 +502,8 @@ def add_catalog_item():
         db = get_db()
         db.execute(
             """
-            INSERT INTO catalog_items (name, size, price, available, created_at, image_url, category, kit_types)
-            VALUES (%s, %s, %s, 1, %s, %s, %s, %s)
+            INSERT INTO catalog_items (name, size, price, available, created_at, image_url, category, kit_types, seasons)
+            VALUES (%s, %s, %s, 1, %s, %s, %s, %s, %s)
             """,
             (
                 name,
@@ -481,6 +513,7 @@ def add_catalog_item():
                 image_url,
                 category or None,
                 ", ".join(kit_types),
+                ", ".join(seasons),
             ),
         )
         db.commit()
@@ -492,6 +525,7 @@ def add_catalog_item():
 def update_catalog_item(item_id):
     name = request.form.get("name", "").strip()
     category = request.form.get("category", "").strip()
+    seasons = [s for s in request.form.getlist("seasons") if s in SEASONS]
     kit_types = [k for k in request.form.getlist("kit_types") if k in KIT_TYPES]
     sizes = [s for s in request.form.getlist("sizes") if s in SIZES]
     price = request.form.get("price", "").strip()
@@ -505,10 +539,20 @@ def update_catalog_item(item_id):
     db.execute(
         """
         UPDATE catalog_items
-        SET name = %s, size = %s, price = %s, available = %s, image_url = %s, category = %s, kit_types = %s
+        SET name = %s, size = %s, price = %s, available = %s, image_url = %s, category = %s, kit_types = %s, seasons = %s
         WHERE id = %s
         """,
-        (name, ", ".join(sizes), price, available, image_url, category or None, ", ".join(kit_types), item_id),
+        (
+            name,
+            ", ".join(sizes),
+            price,
+            available,
+            image_url,
+            category or None,
+            ", ".join(kit_types),
+            ", ".join(seasons),
+            item_id,
+        ),
     )
     db.commit()
     return redirect(url_for("admin"))
