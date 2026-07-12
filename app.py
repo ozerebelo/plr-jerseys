@@ -169,10 +169,12 @@ def init_db():
                 paid_at TEXT,
                 shipped_at TEXT,
                 received_at TEXT,
-                created_at TEXT NOT NULL
+                created_at TEXT NOT NULL,
+                shipping_cost TEXT
             )
             """
         )
+        db.execute("ALTER TABLE supplier_orders ADD COLUMN IF NOT EXISTS shipping_cost TEXT")
         db.execute(
             """
             CREATE TABLE IF NOT EXISTS custom_requests (
@@ -683,6 +685,12 @@ def admin_orders():
             if price_val is not None:
                 so_total_price += price_val
                 so_priced += 1
+        shipping_cost_val = parse_amount(so["shipping_cost"])
+        total_margin = (
+            (so_total_price - so_total_cost)
+            if linked and so_costed == len(linked) and so_priced == len(linked)
+            else None
+        )
         supplier_orders.append(
             {
                 "id": so["id"],
@@ -691,14 +699,16 @@ def admin_orders():
                 "paid_at": so["paid_at"],
                 "shipped_at": so["shipped_at"],
                 "received_at": so["received_at"],
+                "shipping_cost": so["shipping_cost"],
                 "linked": linked,
                 "total_cost": so_total_cost if so_costed else None,
                 "total_cost_partial": bool(so_costed) and so_costed < len(linked),
                 "total_price": so_total_price if so_priced else None,
                 "total_price_partial": bool(so_priced) and so_priced < len(linked),
-                "total_margin": (
-                    (so_total_price - so_total_cost)
-                    if linked and so_costed == len(linked) and so_priced == len(linked)
+                "total_margin": total_margin,
+                "real_margin": (
+                    (total_margin - shipping_cost_val)
+                    if total_margin is not None and shipping_cost_val is not None
                     else None
                 ),
             }
@@ -979,6 +989,7 @@ def add_supplier_order():
 @app.route("/admin/supplier_orders/update/<int:supplier_order_id>", methods=["POST"])
 def update_supplier_order(supplier_order_id):
     label = request.form.get("label", "").strip()
+    shipping_cost = request.form.get("shipping_cost", "").strip()
 
     db = get_db()
     existing = db.execute("SELECT * FROM supplier_orders WHERE id = %s", (supplier_order_id,)).fetchone()
@@ -994,10 +1005,10 @@ def update_supplier_order(supplier_order_id):
     db.execute(
         """
         UPDATE supplier_orders
-        SET label = %s, ordered_at = %s, paid_at = %s, shipped_at = %s, received_at = %s
+        SET label = %s, ordered_at = %s, paid_at = %s, shipped_at = %s, received_at = %s, shipping_cost = %s
         WHERE id = %s
         """,
-        (label or None, ordered_at, paid_at, shipped_at, received_at, supplier_order_id),
+        (label or None, ordered_at, paid_at, shipped_at, received_at, shipping_cost or None, supplier_order_id),
     )
     db.commit()
     return redirect(url_for("admin_orders"))

@@ -39,6 +39,7 @@
       <div class="order-card-header">
         <div class="supplier-milestones">
           <input type="text" name="label" form="supplier-form-{{ so.id }}" value="{{ so.label or '' }}" placeholder="Etiqueta do Lote #{{ so.id }}">
+          <input type="text" name="shipping_cost" form="supplier-form-{{ so.id }}" value="{{ so.shipping_cost or '' }}" placeholder="envio" style="width: 90px;">
           <label><input type="checkbox" name="ordered" form="supplier-form-{{ so.id }}" {% if so.ordered_at %}checked{% endif %}> Encomendado{% if so.ordered_at %} <span class="tiny-date">{{ so.ordered_at }}</span>{% endif %}</label>
           <label><input type="checkbox" name="paid" form="supplier-form-{{ so.id }}" {% if so.paid_at %}checked{% endif %}> Pago{% if so.paid_at %} <span class="tiny-date">{{ so.paid_at }}</span>{% endif %}</label>
           <label><input type="checkbox" name="shipped" form="supplier-form-{{ so.id }}" {% if so.shipped_at %}checked{% endif %}> Enviado{% if so.shipped_at %} <span class="tiny-date">{{ so.shipped_at }}</span>{% endif %}</label>
@@ -76,8 +77,9 @@
       {% if so.total_price is not none or so.total_cost is not none %}
       <div class="order-card-footer">
         {% if so.total_price is not none %}Total de venda: {{ '%.2f'|format(so.total_price) }}{% if so.total_price_partial %}<span class="tiny-date"> (parcial)</span>{% endif %}{% endif %}
-        {% if so.total_cost is not none %} &middot; Total de custo: {{ '%.2f'|format(so.total_cost) }}{% if so.total_cost_partial %}<span class="tiny-date"> (parcial)</span>{% endif %}{% endif %}
-        {% if so.total_margin is not none %} &middot; Margem: {{ '%.2f'|format(so.total_margin) }}{% endif %}
+        {% if so.total_cost is not none %} &middot; Total de custo (camisolas): {{ '%.2f'|format(so.total_cost) }}{% if so.total_cost_partial %}<span class="tiny-date"> (parcial)</span>{% endif %}{% endif %}
+        {% if so.shipping_cost %} &middot; Envio: {{ so.shipping_cost }}{% endif %}
+        {% if so.real_margin is not none %} &middot; Margem real: {{ '%.2f'|format(so.real_margin) }}{% elif so.total_margin is not none %} &middot; Margem (sem envio): {{ '%.2f'|format(so.total_margin) }}<span class="tiny-date"> (adiciona o envio para a margem real)</span>{% endif %}
       </div>
       {% endif %}
 
