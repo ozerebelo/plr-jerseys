@@ -300,7 +300,11 @@ def send_new_order_email(coworker_name, phone, notes, line_items, custom_request
     req = urllib.request.Request(
         "https://api.resend.com/emails",
         data=body,
-        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "User-Agent": "PLR-Jerseys/1.0 (+https://plr-jerseys-six.vercel.app)",
+        },
         method="POST",
     )
     try:
