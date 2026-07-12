@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PLR-Jerseys — Catálogo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="container wide">
+    <header class="site-header">
+      <a class="brand" href="{{ url_for('index') }}"><span class="brand-mark">PLR</span><span class="brand-rest">-Jerseys</span></a>
+      <span class="brand-tagline">Administração</span>
+    </header>
+    <nav class="admin-nav">
+      <a href="{{ url_for('admin_catalog') }}" class="active">Catálogo</a>
+      <a href="{{ url_for('admin_orders') }}">Encomendas</a>
+    </nav>
+    <h1>Catálogo</h1>
+    <p class="subtitle">O que os colegas veem como "disponível" no formulário de encomenda. Adiciona artigos que confirmaste com o fornecedor; desativa quando esgotar.</p>
+    <p class="muted-text" style="margin-top: -14px; margin-bottom: 16px;">
+      Preços fixos: {{ '%.0f'|format(base_price) }}€ normal, {{ '%.0f'|format(vintage_price) }}€ Vintage, personalização +{{ ('%.2f'|format(personalization_price)).replace('.', ',') }}€ &mdash; calculados automaticamente, sem precisares de definir preço por artigo.
+    </p>
+
+    <div class="card" style="overflow-x: auto;">
+      <table>
+        <thead>
+          <tr>
+            <th>Imagem</th>
+            <th>Categoria</th>
+            <th>Artigo</th>
+            <th>Temporadas</th>
+            <th>Tipos</th>
+            <th>Tamanho</th>
+            <th>Disponível</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in catalog %}
+          {% set item_sizes = (item.size or '').split(',') | map('trim') | list %}
+          {% set item_kit_types = (item.kit_types or '').split(',') | map('trim') | list %}
+          {% set item_seasons = (item.seasons or '').split(',') | map('trim') | list %}
+          <tr>
+            <td>
+              {% if item.image_url %}
+              <img class="thumb" src="{{ image_src(item.image_url) }}" alt="">
+              {% else %}
+              <div class="thumb thumb-empty"></div>
+              {% endif %}
+              <input type="file" name="image" form="catalog-form-{{ item.id }}" accept="image/*" class="thumb-input">
+            </td>
+            <td>
+              <select name="category" form="catalog-form-{{ item.id }}">
+                <option value="" {% if not item.category %}selected{% endif %}>—</option>
+                {% for c in categories %}
+                <option value="{{ c }}" {% if c == item.category %}selected{% endif %}>{{ c }}</option>
+                {% endfor %}
+              </select>
+            </td>
+            <td><input type="text" name="name" form="catalog-form-{{ item.id }}" value="{{ item.name }}" required></td>
+            <td>
+              <div class="size-checks">
+                {% for s in seasons %}
+                <label class="size-check"><input type="checkbox" name="seasons" form="catalog-form-{{ item.id }}" value="{{ s }}" {% if s in item_seasons %}checked{% endif %}>{{ s }}</label>
+                {% endfor %}
+              </div>
+            </td>
+            <td>
+              <div class="size-checks">
+                {% for k in kit_types %}
+                <label class="size-check"><input type="checkbox" name="kit_types" form="catalog-form-{{ item.id }}" value="{{ k }}" {% if k in item_kit_types %}checked{% endif %}>{{ k }}</label>
+                {% endfor %}
+              </div>
+            </td>
+            <td>
+              <div class="size-checks">
+                {% for s in sizes %}
+                <label class="size-check"><input type="checkbox" name="sizes" form="catalog-form-{{ item.id }}" value="{{ s }}" {% if s in item_sizes %}checked{% endif %}>{{ s }}</label>
+                {% endfor %}
+              </div>
+            </td>
+            <td><input type="checkbox" name="available" form="catalog-form-{{ item.id }}" {% if item.available %}checked{% endif %}></td>
+            <td>
+              <form id="catalog-form-{{ item.id }}" method="POST" action="{{ url_for('update_catalog_item', item_id=item.id) }}" enctype="multipart/form-data" style="display:inline;">
+                <button type="submit">Guardar</button>
+              </form>
+              <form method="POST" action="{{ url_for('delete_catalog_item', item_id=item.id) }}" onsubmit="return confirm('Eliminar este artigo do catálogo?');" style="display:inline;">
+                <button type="submit" class="delete-btn">Eliminar</button>
+              </form>
+            </td>
+          </tr>
+          {% if item.variant_combos %}
+          <tr>
+            <td colspan="8" style="padding-top: 0;">
+              <div class="variant-images">
+                {% for combo in item.variant_combos %}
+                <div class="variant-image-slot">
+                  {% if combo.image_url %}
+                  <img class="thumb" src="{{ image_src(combo.image_url) }}" alt="">
+                  {% else %}
+                  <div class="thumb thumb-empty"></div>
+                  {% endif %}
+                  <span class="variant-image-label">{{ combo.kit_type }} · {{ combo.season }}</span>
+                  <input type="hidden" name="variant_kit_type[]" form="catalog-form-{{ item.id }}" value="{{ combo.kit_type }}">
+                  <input type="hidden" name="variant_season[]" form="catalog-form-{{ item.id }}" value="{{ combo.season }}">
+                  <input type="file" name="variant_image[]" form="catalog-form-{{ item.id }}" accept="image/*" class="thumb-input">
+                </div>
+                {% endfor %}
+              </div>
+            </td>
+          </tr>
+          {% elif item.kit_types and item.seasons %}
+          <tr>
+            <td colspan="8" class="muted-text" style="padding-top: 0;">Guarda o artigo para poderes adicionar imagens por temporada/tipo.</td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="8" class="muted-text" style="padding-top: 0;">Define temporadas e tipos para poderes adicionar imagens por combinação.</td>
+          </tr>
+          {% endif %}
+          {% else %}
+          <tr>
+            <td colspan="8" style="color: var(--muted);">Ainda não há artigos no catálogo.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <form method="POST" action="{{ url_for('add_catalog_item') }}" enctype="multipart/form-data" style="margin-top: 14px;">
+        <div class="inline-form" style="flex-wrap: wrap;">
+          <select name="category">
+            <option value="" selected>Categoria</option>
+            {% for c in categories %}
+            <option value="{{ c }}">{{ c }}</option>
+            {% endfor %}
+          </select>
+          <input type="text" name="name" placeholder="Nome do artigo" required>
+          <div class="size-checks">
+            {% for s in seasons %}
+            <label class="size-check"><input type="checkbox" name="seasons" value="{{ s }}">{{ s }}</label>
+            {% endfor %}
+          </div>
+          <div class="size-checks">
+            {% for k in kit_types %}
+            <label class="size-check"><input type="checkbox" name="kit_types" value="{{ k }}">{{ k }}</label>
+            {% endfor %}
+          </div>
+          <div class="size-checks">
+            {% for s in sizes %}
+            <label class="size-check"><input type="checkbox" name="sizes" value="{{ s }}">{{ s }}</label>
+            {% endfor %}
+          </div>
+          <input type="file" name="image" accept="image/*">
+          <button type="submit">Adicionar artigo</button>
+        </div>
+      </form>
+
+      <details class="bulk-add">
+        <summary>Adicionar vários artigos de uma vez</summary>
+        <form method="POST" action="{{ url_for('bulk_add_catalog_items') }}">
+          <label for="bulk_text">Um artigo por linha: <code>Categoria | Nome | Temporadas | Tipos | Tamanhos</code> &mdash; categoria deve ser uma das da lista ({{ categories | join(', ') }}); temporadas ({{ seasons | join(', ') }}), tipos ({{ kit_types | join(', ') }}) e tamanhos são opcionais. Adiciona imagens depois na tabela acima.</label>
+          <textarea id="bulk_text" name="bulk_text" rows="6" placeholder="La Liga | Real Madrid | {{ seasons[0] }} | Casa, Fora | M, L, XL&#10;Premier League | Manchester City | {{ seasons[0] }} | Casa | S, M, L&#10;Vintage | Brasil 1994 | {{ seasons[1] }}"></textarea>
+          <button type="submit">Importar linhas</button>
+        </form>
+      </details>
+
+      {% if catalog %}
+      <details class="bulk-add">
+        <summary>Editar catálogo em massa</summary>
+        <form method="POST" action="{{ url_for('bulk_edit_catalog_items') }}">
+          <label for="bulk_edit_text">Uma linha por artigo: <code>ID | Disponível (sim/não) | Categoria | Nome | Temporadas | Tipos | Tamanhos</code> &mdash; edita o texto abaixo e grava tudo de uma vez. Isto só atualiza artigos existentes (pelo ID no início da linha); não apaga nem cria artigos novos, e não mexe nas imagens.</label>
+          <textarea id="bulk_edit_text" name="bulk_edit_text" rows="{{ catalog|length + 1 }}">{% for item in catalog %}{{ item.id }} | {{ 'sim' if item.available else 'não' }} | {{ item.category or '' }} | {{ item.name }} | {{ item.seasons or '' }} | {{ item.kit_types or '' }} | {{ item.size or '' }}
+{% endfor %}</textarea>
+          <button type="submit">Guardar alterações em massa</button>
+        </form>
+      </details>
+      {% endif %}
+    </div>
+
+    <a class="admin-link" href="{{ url_for('index') }}">voltar ao formulário de encomenda</a>
+  </div>
+</body>
+</html>

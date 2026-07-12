@@ -79,6 +79,31 @@ body {
   letter-spacing: 0.1em;
 }
 
+.admin-nav {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.admin-nav a {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  text-decoration: none;
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.admin-nav a.active {
+  color: #052e16;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
 h1 {
   font-family: var(--font-display);
   font-size: 22px;
@@ -102,6 +127,35 @@ p.subtitle {
   margin: 0 0 12px 0;
   text-transform: uppercase;
   letter-spacing: 0.03em;
+}
+
+.instructions-card {
+  padding: 16px 20px;
+}
+
+.instructions-list {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.instructions-list li {
+  margin-bottom: 6px;
+}
+
+.instructions-list li:last-child {
+  margin-bottom: 0;
+}
+
+.instructions-note {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 10px 0 0 0;
+}
+
+.instructions-note strong {
+  color: var(--text);
 }
 
 .card {
@@ -311,7 +365,7 @@ a.admin-link {
 .line-item {
   display: grid;
   grid-template-columns: 2fr 1fr 1fr 1fr 70px 28px;
-  grid-template-rows: auto auto auto auto;
+  grid-template-rows: auto auto auto auto auto;
   gap: 8px;
   align-items: center;
   padding-bottom: 10px;
@@ -379,6 +433,29 @@ a.admin-link {
   color: var(--text);
   margin: 0;
   white-space: nowrap;
+}
+
+.item-image-field {
+  grid-column: 1 / -1;
+  grid-row: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.item-image-label {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0;
+  white-space: nowrap;
+}
+
+.item-image-input {
+  flex: 1;
+  min-width: 160px;
+  padding: 6px;
+  font-size: 12px;
 }
 
 .personalize-check input {

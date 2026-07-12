@@ -24,7 +24,7 @@ STATUS_LABELS = {
     "fulfilled": "Entregue",
     "rejected": "Rejeitado",
 }
-SIZES = ["XS", "S", "M", "L", "XL", "XXL", "XXXL"]
+SIZES = ["XS", "S", "M", "L", "XL", "XXL", "XXXL", "4XL"]
 CATEGORIES = [
     "1ª Liga",
     "La Liga",
@@ -109,7 +109,8 @@ def init_db():
                 season TEXT,
                 personalization TEXT,
                 item_note TEXT,
-                phone TEXT
+                phone TEXT,
+                item_image_url TEXT
             )
             """
         )
@@ -119,6 +120,7 @@ def init_db():
         db.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS personalization TEXT")
         db.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS item_note TEXT")
         db.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS phone TEXT")
+        db.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS item_image_url TEXT")
         db.execute(
             """
             CREATE TABLE IF NOT EXISTS catalog_items (
@@ -189,6 +191,17 @@ def init_db():
                     ELSE seasons || ', ' || category
                 END
             WHERE category IN ('Mundial 2026', 'Euro 2024', 'Outras Seleções')
+            """
+        )
+        # One-time backfill: add 4XL to every existing catalog item. Remove after it has run once in production.
+        db.execute(
+            """
+            UPDATE catalog_items
+            SET size = CASE
+                WHEN size IS NULL OR size = '' THEN '4XL'
+                ELSE size || ', 4XL'
+            END
+            WHERE size IS NULL OR position('4XL' IN size) = 0
             """
         )
         db.commit()
@@ -327,6 +340,7 @@ def create_order():
     personalize_flags = request.form.getlist("personalize[]")
     personalize_texts = request.form.getlist("personalize_text[]")
     item_notes = request.form.getlist("item_note[]")
+    item_images = request.files.getlist("item_image[]")
 
     db = get_db()
     catalog = enrich_catalog_items(
@@ -416,7 +430,12 @@ def create_order():
         except ValueError:
             quantity = 1
 
-        line_items.append((name, season, kit_type, size, quantity, is_custom, price_str, personalization, item_note))
+        image_file = item_images[i] if i < len(item_images) else None
+        item_image_url = save_uploaded_image(image_file)
+
+        line_items.append(
+            (name, season, kit_type, size, quantity, is_custom, price_str, personalization, item_note, item_image_url)
+        )
 
     if not coworker_name or not phone or (not line_items and not custom_request_text):
         return render_template(
@@ -427,13 +446,13 @@ def create_order():
 
     request_id = uuid.uuid4().hex[:8]
     created_at = datetime.now().isoformat(timespec="seconds")
-    for name, season, kit_type, size, quantity, is_custom, price_str, personalization, item_note in line_items:
+    for name, season, kit_type, size, quantity, is_custom, price_str, personalization, item_note, item_image_url in line_items:
         db.execute(
             """
             INSERT INTO orders
                 (coworker_name, item_description, season, kit_type, size, quantity, notes, status,
-                 price, created_at, request_id, is_custom, personalization, item_note, phone)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, 'pending', %s, %s, %s, %s, %s, %s, %s)
+                 price, created_at, request_id, is_custom, personalization, item_note, phone, item_image_url)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, 'pending', %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 coworker_name,
@@ -450,6 +469,7 @@ def create_order():
                 personalization or None,
                 item_note or None,
                 phone,
+                item_image_url,
             ),
         )
 
@@ -468,7 +488,26 @@ def create_order():
 
 
 @app.route("/admin")
-def admin():
+def admin_catalog():
+    db = get_db()
+    catalog = attach_variant_combos(
+        db, db.execute("SELECT * FROM catalog_items ORDER BY category ASC NULLS LAST, name ASC").fetchall()
+    )
+    return render_template(
+        "admin_catalog.html",
+        catalog=catalog,
+        sizes=SIZES,
+        categories=CATEGORIES,
+        kit_types=KIT_TYPES,
+        seasons=SEASONS,
+        base_price=BASE_PRICE,
+        vintage_price=VINTAGE_PRICE,
+        personalization_price=PERSONALIZATION_PRICE,
+    )
+
+
+@app.route("/admin/encomendas")
+def admin_orders():
     db = get_db()
     rows = db.execute("SELECT * FROM orders ORDER BY created_at DESC, id ASC").fetchall()
 
@@ -580,22 +619,11 @@ def admin():
             }
         )
 
-    catalog = attach_variant_combos(
-        db, db.execute("SELECT * FROM catalog_items ORDER BY category ASC NULLS LAST, name ASC").fetchall()
-    )
     return render_template(
-        "admin.html",
+        "admin_orders.html",
         order_groups=order_groups,
         statuses=STATUSES,
         status_labels=STATUS_LABELS,
-        catalog=catalog,
-        sizes=SIZES,
-        categories=CATEGORIES,
-        kit_types=KIT_TYPES,
-        seasons=SEASONS,
-        base_price=BASE_PRICE,
-        vintage_price=VINTAGE_PRICE,
-        personalization_price=PERSONALIZATION_PRICE,
         supplier_orders=supplier_orders,
         custom_request_statuses=CUSTOM_REQUEST_STATUSES,
         custom_request_status_labels=CUSTOM_REQUEST_STATUS_LABELS,
@@ -632,7 +660,7 @@ def bulk_add_catalog_items():
         )
     db.commit()
 
-    return redirect(url_for("admin"))
+    return redirect(url_for("admin_catalog"))
 
 
 @app.route("/admin/catalog/bulk_edit", methods=["POST"])
@@ -674,7 +702,7 @@ def bulk_edit_catalog_items():
         )
     db.commit()
 
-    return redirect(url_for("admin"))
+    return redirect(url_for("admin_catalog"))
 
 
 @app.route("/admin/catalog/add", methods=["POST"])
@@ -705,7 +733,7 @@ def add_catalog_item():
         )
         db.commit()
 
-    return redirect(url_for("admin"))
+    return redirect(url_for("admin_catalog"))
 
 
 @app.route("/admin/catalog/update/<int:item_id>", methods=["POST"])
@@ -762,7 +790,7 @@ def update_catalog_item(item_id):
         )
 
     db.commit()
-    return redirect(url_for("admin"))
+    return redirect(url_for("admin_catalog"))
 
 
 @app.route("/admin/catalog/delete/<int:item_id>", methods=["POST"])
@@ -770,7 +798,7 @@ def delete_catalog_item(item_id):
     db = get_db()
     db.execute("DELETE FROM catalog_items WHERE id = %s", (item_id,))
     db.commit()
-    return redirect(url_for("admin"))
+    return redirect(url_for("admin_catalog"))
 
 
 @app.route("/admin/update/<int:order_id>", methods=["POST"])
@@ -781,7 +809,7 @@ def update_order(order_id):
     supplier_order_raw = request.form.get("supplier_order_id", "").strip()
 
     if status not in STATUSES:
-        return redirect(url_for("admin"))
+        return redirect(url_for("admin_orders"))
 
     supplier_order_id = int(supplier_order_raw) if supplier_order_raw.isdigit() else None
 
@@ -791,7 +819,7 @@ def update_order(order_id):
         (status, price, cost, supplier_order_id, order_id),
     )
     db.commit()
-    return redirect(url_for("admin"))
+    return redirect(url_for("admin_orders"))
 
 
 @app.route("/admin/delete/<int:order_id>", methods=["POST"])
@@ -799,7 +827,7 @@ def delete_order(order_id):
     db = get_db()
     db.execute("DELETE FROM orders WHERE id = %s", (order_id,))
     db.commit()
-    return redirect(url_for("admin"))
+    return redirect(url_for("admin_orders"))
 
 
 @app.route("/admin/custom_requests/update/<int:request_id>", methods=["POST"])
@@ -816,7 +844,7 @@ def update_custom_request(request_id):
         (status, admin_reply, request_id),
     )
     db.commit()
-    return redirect(url_for("admin"))
+    return redirect(url_for("admin_orders"))
 
 
 @app.route("/admin/custom_requests/delete/<int:request_id>", methods=["POST"])
@@ -824,7 +852,7 @@ def delete_custom_request(request_id):
     db = get_db()
     db.execute("DELETE FROM custom_requests WHERE id = %s", (request_id,))
     db.commit()
-    return redirect(url_for("admin"))
+    return redirect(url_for("admin_orders"))
 
 
 @app.route("/admin/custom_requests/promote/<int:request_id>", methods=["POST"])
@@ -832,7 +860,7 @@ def promote_custom_request(request_id):
     db = get_db()
     row = db.execute("SELECT * FROM custom_requests WHERE id = %s", (request_id,)).fetchone()
     if row is None:
-        return redirect(url_for("admin"))
+        return redirect(url_for("admin_orders"))
 
     db.execute(
         """
@@ -846,7 +874,7 @@ def promote_custom_request(request_id):
         (row["admin_reply"] or "Adicionado ao catálogo.", request_id),
     )
     db.commit()
-    return redirect(url_for("admin"))
+    return redirect(url_for("admin_orders"))
 
 
 @app.route("/admin/supplier_orders/add", methods=["POST"])
@@ -858,7 +886,7 @@ def add_supplier_order():
         (label or None, datetime.now().isoformat(timespec="seconds")),
     )
     db.commit()
-    return redirect(url_for("admin"))
+    return redirect(url_for("admin_orders"))
 
 
 @app.route("/admin/supplier_orders/update/<int:supplier_order_id>", methods=["POST"])
@@ -868,7 +896,7 @@ def update_supplier_order(supplier_order_id):
     db = get_db()
     existing = db.execute("SELECT * FROM supplier_orders WHERE id = %s", (supplier_order_id,)).fetchone()
     if existing is None:
-        return redirect(url_for("admin"))
+        return redirect(url_for("admin_orders"))
 
     today = datetime.now().date().isoformat()
     ordered_at = milestone_date(request.form, "ordered", existing["ordered_at"], today)
@@ -885,7 +913,7 @@ def update_supplier_order(supplier_order_id):
         (label or None, ordered_at, paid_at, shipped_at, received_at, supplier_order_id),
     )
     db.commit()
-    return redirect(url_for("admin"))
+    return redirect(url_for("admin_orders"))
 
 
 @app.route("/admin/supplier_orders/delete/<int:supplier_order_id>", methods=["POST"])
@@ -894,7 +922,7 @@ def delete_supplier_order(supplier_order_id):
     db.execute("UPDATE orders SET supplier_order_id = NULL WHERE supplier_order_id = %s", (supplier_order_id,))
     db.execute("DELETE FROM supplier_orders WHERE id = %s", (supplier_order_id,))
     db.commit()
-    return redirect(url_for("admin"))
+    return redirect(url_for("admin_orders"))
 
 
 with app.app_context():

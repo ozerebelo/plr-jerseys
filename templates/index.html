@@ -17,6 +17,17 @@
     <h1>Pedido de Camisola</h1>
     <p class="subtitle">Preenche isto e eu verifico o stock e o preço, depois digo-te alguma coisa.</p>
 
+    <div class="card instructions-card">
+      <p class="card-title">Como funciona</p>
+      <ol class="instructions-list">
+        <li>Escolhe um artigo do catálogo, depois a temporada, tipo, tamanho e quantidade.</li>
+        <li>Se quiseres personalizar (nome, número, logos), marca a opção — tem custo extra.</li>
+        <li>Envia o pedido. Confirmo o stock e o preço contigo a seguir, antes de encomendar.</li>
+      </ol>
+      <p class="instructions-note"><strong>Artigos Vintage:</strong> escolhe o artigo "Vintage" no catálogo e escreve no campo que aparece o que procuras (equipa, ano, jogador...).</p>
+      <p class="instructions-note"><strong>Não está no catálogo?</strong> Escolhe "+ Outro artigo", escreve o nome à mão e/ou anexa uma foto do que queres na opção "Tens uma foto do que queres?" — trato do resto a partir daí.</p>
+    </div>
+
     {% if success %}
       <div class="success">Obrigado! O teu pedido foi enviado. Aviso assim que verificar o stock e o preço.</div>
     {% endif %}
@@ -25,7 +36,7 @@
     {% endif %}
 
     <div class="card">
-      <form method="POST" action="{{ url_for('create_order') }}">
+      <form method="POST" action="{{ url_for('create_order') }}" enctype="multipart/form-data">
         <label for="coworker_name">O teu nome</label>
         <input type="text" id="coworker_name" name="coworker_name" required>
 
@@ -87,6 +98,10 @@
               <input type="hidden" name="personalize[]" class="personalize-flag" value="">
               <input type="text" name="personalize_text[]" class="personalize-text" placeholder="ex: Ronaldo 7" style="display:none;">
             </div>
+            <div class="item-image-field">
+              <label class="item-image-label">Tens uma foto do que queres? (opcional)</label>
+              <input type="file" name="item_image[]" class="item-image-input" accept="image/*">
+            </div>
           </div>
         </div>
         <button type="button" class="add-item-btn" onclick="addLineItem()">+ Adicionar outro artigo</button>
@@ -102,7 +117,7 @@
       </form>
     </div>
 
-    <a class="admin-link" href="{{ url_for('admin') }}">administração</a>
+    <a class="admin-link" href="{{ url_for('admin_catalog') }}">administração</a>
   </div>
 
   <script>
@@ -301,6 +316,7 @@
       preview.removeAttribute('src');
       preview.style.display = 'none';
       updateVintageNoteField(row, false);
+      row.querySelector('.item-image-input').value = '';
     }
 
     function addLineItem() {
