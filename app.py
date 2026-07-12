@@ -1,6 +1,8 @@
+import json
 import os
 import re
 import secrets
+import urllib.request
 import uuid
 from datetime import datetime
 from itertools import groupby
@@ -246,6 +248,50 @@ def save_uploaded_image(file_storage):
     return f"uploads/{unique_name}"
 
 
+def send_new_order_email(coworker_name, phone, notes, line_items, custom_request_text):
+    api_key = os.environ.get("RESEND_API_KEY")
+    notify_email = os.environ.get("NOTIFY_EMAIL")
+    if not api_key or not notify_email:
+        return
+
+    rows_html = ""
+    for name, season, kit_type, size, quantity, is_custom, price_str, personalization, item_note, item_image_url in line_items:
+        details = ", ".join(
+            filter(None, [season, kit_type, size and f"tam. {size}", price_str, personalization and f"personalizar: {personalization}", item_note])
+        )
+        label = f"{name} (fora do catálogo)" if is_custom else name
+        rows_html += f"<li>{quantity}x {label}" + (f" — {details}" if details else "") + "</li>"
+
+    custom_html = f"<p><strong>Pergunta/pedido:</strong> {custom_request_text}</p>" if custom_request_text else ""
+    notes_html = f"<p><strong>Notas:</strong> {notes}</p>" if notes else ""
+
+    html = (
+        f"<p><strong>{coworker_name}</strong> ({phone}) fez um novo pedido.</p>"
+        f"<ul>{rows_html}</ul>"
+        f"{custom_html}{notes_html}"
+    )
+
+    body = json.dumps(
+        {
+            "from": "PLR-Jerseys <onboarding@resend.dev>",
+            "to": [notify_email],
+            "subject": f"Novo pedido — {coworker_name}",
+            "html": html,
+        }
+    ).encode()
+
+    req = urllib.request.Request(
+        "https://api.resend.com/emails",
+        data=body,
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        urllib.request.urlopen(req, timeout=5)
+    except Exception:
+        pass
+
+
 def resolve_image_src(image_url):
     if not image_url:
         return None
@@ -483,6 +529,8 @@ def create_order():
         )
 
     db.commit()
+
+    send_new_order_email(coworker_name, phone, notes, line_items, custom_request_text)
 
     return render_template("index.html", success=True, catalog=catalog)
 
