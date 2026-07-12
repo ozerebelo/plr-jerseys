@@ -78,9 +78,13 @@
               <input type="hidden" name="season_is_custom[]" class="season-custom-flag" value="">
               <input type="text" name="season[]" class="season-custom-input" placeholder="ex: 2015/2016" disabled>
             </div>
-            <select name="kit_type[]" class="kit-select" onchange="updatePreviewImage(this)">
-              <option value="" disabled selected>Escolhe um artigo primeiro</option>
-            </select>
+            <div class="kit-field">
+              <select name="kit_type[]" class="kit-select" onchange="updatePreviewImage(this); toggleKitCustom(this)">
+                <option value="" disabled selected>Escolhe um artigo primeiro</option>
+              </select>
+              <input type="hidden" name="kit_type_is_custom[]" class="kit-custom-flag" value="">
+              <input type="text" name="kit_type[]" class="kit-custom-input" placeholder="ex: Treino" disabled>
+            </div>
             <div class="size-field">
               <select name="size[]" class="size-select">
                 <option value="" disabled selected>Escolhe um artigo primeiro</option>
@@ -125,29 +129,6 @@
   </div>
 
   <script>
-    function populateOptionalSelect(selectEl, values, placeholderText) {
-      selectEl.innerHTML = '';
-      if (values.length) {
-        const placeholder = document.createElement('option');
-        placeholder.value = '';
-        placeholder.disabled = true;
-        placeholder.selected = true;
-        placeholder.textContent = placeholderText;
-        selectEl.appendChild(placeholder);
-        values.forEach(function (v) {
-          const opt = document.createElement('option');
-          opt.value = v;
-          opt.textContent = v;
-          selectEl.appendChild(opt);
-        });
-      } else {
-        const opt = document.createElement('option');
-        opt.value = '';
-        opt.textContent = 'Não aplicável';
-        selectEl.appendChild(opt);
-      }
-    }
-
     function populateSeasonSelect(selectEl, values) {
       selectEl.innerHTML = '';
       const placeholder = document.createElement('option');
@@ -187,6 +168,45 @@
       }
     }
 
+    function populateKitSelect(selectEl, values) {
+      selectEl.innerHTML = '';
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.disabled = true;
+      placeholder.selected = true;
+      placeholder.textContent = values.length ? 'Escolhe o tipo' : 'Sem tipos indicados';
+      selectEl.appendChild(placeholder);
+      values.forEach(function (v) {
+        const opt = document.createElement('option');
+        opt.value = v;
+        opt.textContent = v;
+        selectEl.appendChild(opt);
+      });
+      const customOpt = document.createElement('option');
+      customOpt.value = '__custom__';
+      customOpt.textContent = '+ Outro (não listado)';
+      selectEl.appendChild(customOpt);
+    }
+
+    function toggleKitCustom(selectEl) {
+      const row = selectEl.closest('.line-item');
+      const flag = row.querySelector('.kit-custom-flag');
+      const input = row.querySelector('.kit-custom-input');
+      if (selectEl.value === '__custom__') {
+        selectEl.disabled = true;
+        selectEl.style.display = 'none';
+        flag.value = '1';
+        input.disabled = false;
+        input.style.display = 'block';
+        input.focus();
+      } else {
+        flag.value = '';
+        input.disabled = true;
+        input.style.display = 'none';
+        input.value = '';
+      }
+    }
+
     function updateItemFields(selectEl) {
       const row = selectEl.closest('.line-item');
       const seasonSelect = row.querySelector('.season-select');
@@ -206,6 +226,7 @@
         seasonSelect.innerHTML = '<option value="">Não aplicável</option>';
         toggleSeasonCustom(seasonSelect);
         kitSelect.innerHTML = '<option value="">Não aplicável</option>';
+        toggleKitCustom(kitSelect);
 
         sizeSelect.disabled = true;
         sizeSelect.style.display = 'none';
@@ -232,7 +253,8 @@
         .split(',')
         .map(function (s) { return s.trim(); })
         .filter(Boolean);
-      populateOptionalSelect(kitSelect, kitTypes, 'Escolhe o tipo');
+      populateKitSelect(kitSelect, kitTypes);
+      toggleKitCustom(kitSelect);
 
       const sizes = (selected.dataset.sizes || '')
         .split(',')
@@ -356,6 +378,13 @@
       seasonCustomInput.style.display = 'none';
 
       kitSelect.innerHTML = '<option value="" disabled selected>Escolhe um artigo primeiro</option>';
+      kitSelect.disabled = false;
+      kitSelect.style.display = '';
+      row.querySelector('.kit-custom-flag').value = '';
+      const kitCustomInput = row.querySelector('.kit-custom-input');
+      kitCustomInput.value = '';
+      kitCustomInput.disabled = true;
+      kitCustomInput.style.display = 'none';
 
       sizeSelect.innerHTML = '<option value="" disabled selected>Escolhe um artigo primeiro</option>';
       sizeSelect.disabled = false;

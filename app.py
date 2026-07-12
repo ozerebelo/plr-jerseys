@@ -417,6 +417,7 @@ def create_order():
     seasons = request.form.getlist("season[]")
     season_custom_flags = request.form.getlist("season_is_custom[]")
     kit_types = request.form.getlist("kit_type[]")
+    kit_type_custom_flags = request.form.getlist("kit_type_is_custom[]")
     sizes = request.form.getlist("size[]")
     quantities = request.form.getlist("quantity[]")
     personalize_flags = request.form.getlist("personalize[]")
@@ -440,6 +441,7 @@ def create_order():
         season = seasons[i].strip() if i < len(seasons) else ""
         season_is_custom = (season_custom_flags[i].strip() == "1") if i < len(season_custom_flags) else False
         kit_type = kit_types[i].strip() if i < len(kit_types) else ""
+        kit_type_is_custom = (kit_type_custom_flags[i].strip() == "1") if i < len(kit_type_custom_flags) else False
         size = sizes[i].strip() if i < len(sizes) else ""
         personalized = (personalize_flags[i].strip() == "1") if i < len(personalize_flags) else False
         personalization = personalize_texts[i].strip() if i < len(personalize_texts) else ""
@@ -461,16 +463,25 @@ def create_order():
                 )
             if not valid_sizes:
                 size = ""
-            valid_kit_types = [k.strip() for k in (matched_item["kit_types"] or "").split(",") if k.strip()]
-            if valid_kit_types and kit_type not in valid_kit_types:
-                return render_template(
-                    "index.html",
-                    error="Um dos tipos de camisola não é válido — volta a escolher da lista.",
-                    catalog=catalog,
-                    catalog_groups=catalog_groups,
-                )
-            if not valid_kit_types:
-                kit_type = ""
+            if kit_type_is_custom:
+                if not kit_type:
+                    return render_template(
+                        "index.html",
+                        error="Escreve o tipo que procuras, ou desmarca a opção de tipo personalizado.",
+                        catalog=catalog,
+                        catalog_groups=catalog_groups,
+                    )
+            else:
+                valid_kit_types = [k.strip() for k in (matched_item["kit_types"] or "").split(",") if k.strip()]
+                if valid_kit_types and kit_type not in valid_kit_types:
+                    return render_template(
+                        "index.html",
+                        error="Um dos tipos de camisola não é válido — volta a escolher da lista.",
+                        catalog=catalog,
+                        catalog_groups=catalog_groups,
+                    )
+                if not valid_kit_types:
+                    kit_type = ""
             if season_is_custom:
                 if not season:
                     return render_template(
