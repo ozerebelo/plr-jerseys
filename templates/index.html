@@ -60,14 +60,14 @@
             <div class="item-field">
               <select name="item_description[]" class="item-select" onchange="updateItemFields(this)">
                 <option value="" disabled selected>Escolhe um artigo</option>
-                {% for category, items in catalog|groupby('category') %}
-                <optgroup label="{{ category or 'Outros' }}">
+                <option value="__custom__">+ Outro artigo (escreve à mão)</option>
+                {% for category, items in catalog_groups %}
+                <optgroup label="{{ category }}">
                   {% for item in items %}
                   <option value="{{ item.name }}" data-category="{{ item.category or '' }}" data-seasons="{{ item.seasons or '' }}" data-kit-types="{{ item.kit_types or '' }}" data-sizes="{{ item.size or '' }}" data-image="{{ image_src(item.image_url) or '' }}" data-images='{{ item.variant_images | tojson }}'>{{ item.name }} — {{ item.display_price }}</option>
                   {% endfor %}
                 </optgroup>
                 {% endfor %}
-                <option value="__custom__">+ Outro artigo (escreve à mão)</option>
               </select>
               <input type="text" name="item_description[]" class="item-custom-input" placeholder="Nome do artigo" disabled>
             </div>

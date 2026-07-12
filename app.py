@@ -38,6 +38,10 @@ CATEGORIES = [
     "Outros",
     "Vintage",
 ]
+# Display order for the order-form catalog dropdown: Vintage first, leagues in the
+# middle, Internacional last. (Custom/"+ Outro artigo" is handled separately, pinned
+# above this list in the template.)
+CATEGORY_DISPLAY_ORDER = ["Vintage"] + [c for c in CATEGORIES if c not in ("Vintage", "Internacional")] + ["Internacional"]
 KIT_TYPES = ["Casa", "Fora", "Alternativa", "Outro"]
 _season_start_year = datetime.now().year if datetime.now().month >= 7 else datetime.now().year - 1
 SEASONS = [f"{_season_start_year - i}/{_season_start_year - i + 1}" for i in range(4)] + [
@@ -329,6 +333,17 @@ def enrich_catalog_items(db, catalog_rows):
     return items
 
 
+def group_catalog_by_category(catalog_items):
+    by_category = {}
+    for item in catalog_items:
+        by_category.setdefault(item["category"] or "Outros", []).append(item)
+
+    groups = [(cat, by_category.pop(cat)) for cat in CATEGORY_DISPLAY_ORDER if cat in by_category]
+    for cat in sorted(by_category.keys()):
+        groups.append((cat, by_category[cat]))
+    return groups
+
+
 def attach_variant_combos(db, catalog_rows):
     ids = [row["id"] for row in catalog_rows]
     variant_lookup = {}
@@ -369,7 +384,7 @@ def index():
             "SELECT * FROM catalog_items WHERE available = 1 ORDER BY category ASC NULLS LAST, name ASC"
         ).fetchall(),
     )
-    return render_template("index.html", catalog=catalog)
+    return render_template("index.html", catalog=catalog, catalog_groups=group_catalog_by_category(catalog))
 
 
 @app.route("/order", methods=["POST"])
@@ -396,6 +411,7 @@ def create_order():
         ).fetchall(),
     )
     catalog_by_name = {c["name"]: c for c in catalog}
+    catalog_groups = group_catalog_by_category(catalog)
 
     line_items = []
     for i, raw_name in enumerate(item_names):
@@ -419,6 +435,7 @@ def create_order():
                     "index.html",
                     error="Um dos artigos ou tamanhos não é válido — volta a escolher da lista.",
                     catalog=catalog,
+                    catalog_groups=catalog_groups,
                 )
             if not valid_sizes:
                 size = ""
@@ -428,6 +445,7 @@ def create_order():
                     "index.html",
                     error="Um dos tipos de camisola não é válido — volta a escolher da lista.",
                     catalog=catalog,
+                    catalog_groups=catalog_groups,
                 )
             if not valid_kit_types:
                 kit_type = ""
@@ -437,6 +455,7 @@ def create_order():
                     "index.html",
                     error="Uma das temporadas não é válida — volta a escolher da lista.",
                     catalog=catalog,
+                    catalog_groups=catalog_groups,
                 )
             if not valid_seasons:
                 season = ""
@@ -445,12 +464,14 @@ def create_order():
                     "index.html",
                     error="Escreve o nome/número a personalizar, ou desmarca a personalização.",
                     catalog=catalog,
+                    catalog_groups=catalog_groups,
                 )
             if matched_item["category"] == "Vintage" and not item_note:
                 return render_template(
                     "index.html",
                     error="Escreve o que procuras no artigo Vintage (equipa, ano, jogador...).",
                     catalog=catalog,
+                    catalog_groups=catalog_groups,
                 )
             if matched_item["category"] != "Vintage":
                 item_note = ""
@@ -464,6 +485,7 @@ def create_order():
                     "index.html",
                     error="Preenche o nome e o tamanho do artigo personalizado.",
                     catalog=catalog,
+                    catalog_groups=catalog_groups,
                 )
             season = ""
             kit_type = ""
@@ -488,6 +510,7 @@ def create_order():
             "index.html",
             error="Preenche o teu nome, o teu telemóvel, e escolhe um artigo ou descreve o que procuras.",
             catalog=catalog,
+            catalog_groups=catalog_groups,
         )
 
     request_id = uuid.uuid4().hex[:8]
@@ -532,7 +555,7 @@ def create_order():
 
     send_new_order_email(coworker_name, phone, notes, line_items, custom_request_text)
 
-    return render_template("index.html", success=True, catalog=catalog)
+    return render_template("index.html", success=True, catalog=catalog, catalog_groups=catalog_groups)
 
 
 @app.route("/admin")
