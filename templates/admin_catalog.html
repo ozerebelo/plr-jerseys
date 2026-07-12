@@ -68,6 +68,7 @@
                 <label class="size-check"><input type="checkbox" name="seasons" form="catalog-form-{{ item.id }}" value="{{ s }}" {% if s in item_seasons %}checked{% endif %}>{{ s }}</label>
                 {% endfor %}
               </div>
+              <input type="text" name="custom_seasons" form="catalog-form-{{ item.id }}" class="custom-seasons-input" placeholder="+ outras temporadas (vírgula)" value="{{ item_seasons | reject('in', seasons) | reject('equalto', '') | join(', ') }}">
             </td>
             <td>
               <div class="size-checks">
@@ -144,6 +145,7 @@
             <label class="size-check"><input type="checkbox" name="seasons" value="{{ s }}">{{ s }}</label>
             {% endfor %}
           </div>
+          <input type="text" name="custom_seasons" class="custom-seasons-input" placeholder="+ outras temporadas (vírgula)">
           <div class="size-checks">
             {% for k in kit_types %}
             <label class="size-check"><input type="checkbox" name="kit_types" value="{{ k }}">{{ k }}</label>

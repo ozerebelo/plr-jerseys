@@ -231,6 +231,15 @@ def milestone_date(form, flag_name, existing_value, today):
     return (existing_value or today) if checked else None
 
 
+def merge_custom_values(selected, custom_text):
+    merged = list(selected)
+    for v in (custom_text or "").split(","):
+        v = v.strip()
+        if v and v not in merged:
+            merged.append(v)
+    return merged
+
+
 def save_uploaded_image(file_storage):
     if not file_storage or not file_storage.filename:
         return None
@@ -786,6 +795,7 @@ def add_catalog_item():
     name = request.form.get("name", "").strip()
     category = request.form.get("category", "").strip()
     seasons = [s for s in request.form.getlist("seasons") if s in SEASONS]
+    seasons = merge_custom_values(seasons, request.form.get("custom_seasons"))
     kit_types = [k for k in request.form.getlist("kit_types") if k in KIT_TYPES]
     sizes = [s for s in request.form.getlist("sizes") if s in SIZES]
     image_url = save_uploaded_image(request.files.get("image"))
@@ -817,6 +827,7 @@ def update_catalog_item(item_id):
     name = request.form.get("name", "").strip()
     category = request.form.get("category", "").strip()
     seasons = [s for s in request.form.getlist("seasons") if s in SEASONS]
+    seasons = merge_custom_values(seasons, request.form.get("custom_seasons"))
     kit_types = [k for k in request.form.getlist("kit_types") if k in KIT_TYPES]
     sizes = [s for s in request.form.getlist("sizes") if s in SIZES]
     available = 1 if request.form.get("available") == "on" else 0

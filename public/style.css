@@ -315,6 +315,14 @@ th {
   gap: 8px;
 }
 
+.custom-seasons-input {
+  width: 100%;
+  min-width: 140px;
+  margin-top: 6px;
+  padding: 4px 6px;
+  font-size: 11px;
+}
+
 .size-check {
   display: flex;
   align-items: center;
