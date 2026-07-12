@@ -2,6 +2,7 @@ import json
 import os
 import re
 import secrets
+import urllib.error
 import urllib.request
 import uuid
 from datetime import datetime
@@ -256,6 +257,7 @@ def send_new_order_email(coworker_name, phone, notes, line_items, custom_request
     api_key = os.environ.get("RESEND_API_KEY")
     notify_email = os.environ.get("NOTIFY_EMAIL")
     if not api_key or not notify_email:
+        print(f"[email] skipped: RESEND_API_KEY set={bool(api_key)}, NOTIFY_EMAIL set={bool(notify_email)}")
         return
 
     rows_html = ""
@@ -291,9 +293,12 @@ def send_new_order_email(coworker_name, phone, notes, line_items, custom_request
         method="POST",
     )
     try:
-        urllib.request.urlopen(req, timeout=5)
-    except Exception:
-        pass
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            print(f"[email] sent, status={resp.status}, body={resp.read()}")
+    except urllib.error.HTTPError as e:
+        print(f"[email] HTTPError {e.code}: {e.read()}")
+    except Exception as e:
+        print(f"[email] failed: {type(e).__name__}: {e}")
 
 
 def resolve_image_src(image_url):
