@@ -384,11 +384,11 @@ a.admin-link {
   margin: 0;
 }
 
-.item-field, .size-field {
+.item-field, .size-field, .season-field {
   display: contents;
 }
 
-.item-custom-input, .size-custom-input {
+.item-custom-input, .size-custom-input, .season-custom-input {
   display: none;
 }
 

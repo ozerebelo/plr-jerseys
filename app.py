@@ -415,6 +415,7 @@ def create_order():
     custom_request_text = request.form.get("custom_request", "").strip()
     item_names = request.form.getlist("item_description[]")
     seasons = request.form.getlist("season[]")
+    season_custom_flags = request.form.getlist("season_is_custom[]")
     kit_types = request.form.getlist("kit_type[]")
     sizes = request.form.getlist("size[]")
     quantities = request.form.getlist("quantity[]")
@@ -437,6 +438,7 @@ def create_order():
     for i, raw_name in enumerate(item_names):
         name = raw_name.strip()
         season = seasons[i].strip() if i < len(seasons) else ""
+        season_is_custom = (season_custom_flags[i].strip() == "1") if i < len(season_custom_flags) else False
         kit_type = kit_types[i].strip() if i < len(kit_types) else ""
         size = sizes[i].strip() if i < len(sizes) else ""
         personalized = (personalize_flags[i].strip() == "1") if i < len(personalize_flags) else False
@@ -469,16 +471,25 @@ def create_order():
                 )
             if not valid_kit_types:
                 kit_type = ""
-            valid_seasons = [s.strip() for s in (matched_item["seasons"] or "").split(",") if s.strip()]
-            if valid_seasons and season not in valid_seasons:
-                return render_template(
-                    "index.html",
-                    error="Uma das temporadas não é válida — volta a escolher da lista.",
-                    catalog=catalog,
-                    catalog_groups=catalog_groups,
-                )
-            if not valid_seasons:
-                season = ""
+            if season_is_custom:
+                if not season:
+                    return render_template(
+                        "index.html",
+                        error="Escreve a temporada que procuras, ou desmarca a opção de temporada personalizada.",
+                        catalog=catalog,
+                        catalog_groups=catalog_groups,
+                    )
+            else:
+                valid_seasons = [s.strip() for s in (matched_item["seasons"] or "").split(",") if s.strip()]
+                if valid_seasons and season not in valid_seasons:
+                    return render_template(
+                        "index.html",
+                        error="Uma das temporadas não é válida — volta a escolher da lista.",
+                        catalog=catalog,
+                        catalog_groups=catalog_groups,
+                    )
+                if not valid_seasons:
+                    season = ""
             if personalized and not personalization:
                 return render_template(
                     "index.html",

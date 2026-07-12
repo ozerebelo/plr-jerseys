@@ -71,9 +71,13 @@
               </select>
               <input type="text" name="item_description[]" class="item-custom-input" placeholder="Nome do artigo" disabled>
             </div>
-            <select name="season[]" class="season-select" onchange="updatePreviewImage(this)">
-              <option value="" disabled selected>Escolhe um artigo primeiro</option>
-            </select>
+            <div class="season-field">
+              <select name="season[]" class="season-select" onchange="updatePreviewImage(this); toggleSeasonCustom(this)">
+                <option value="" disabled selected>Escolhe um artigo primeiro</option>
+              </select>
+              <input type="hidden" name="season_is_custom[]" class="season-custom-flag" value="">
+              <input type="text" name="season[]" class="season-custom-input" placeholder="ex: 2015/2016" disabled>
+            </div>
             <select name="kit_type[]" class="kit-select" onchange="updatePreviewImage(this)">
               <option value="" disabled selected>Escolhe um artigo primeiro</option>
             </select>
@@ -144,6 +148,45 @@
       }
     }
 
+    function populateSeasonSelect(selectEl, values) {
+      selectEl.innerHTML = '';
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.disabled = true;
+      placeholder.selected = true;
+      placeholder.textContent = values.length ? 'Escolhe a temporada' : 'Sem temporadas indicadas';
+      selectEl.appendChild(placeholder);
+      values.forEach(function (v) {
+        const opt = document.createElement('option');
+        opt.value = v;
+        opt.textContent = v;
+        selectEl.appendChild(opt);
+      });
+      const customOpt = document.createElement('option');
+      customOpt.value = '__custom__';
+      customOpt.textContent = '+ Outra (não listada)';
+      selectEl.appendChild(customOpt);
+    }
+
+    function toggleSeasonCustom(selectEl) {
+      const row = selectEl.closest('.line-item');
+      const flag = row.querySelector('.season-custom-flag');
+      const input = row.querySelector('.season-custom-input');
+      if (selectEl.value === '__custom__') {
+        selectEl.disabled = true;
+        selectEl.style.display = 'none';
+        flag.value = '1';
+        input.disabled = false;
+        input.style.display = 'block';
+        input.focus();
+      } else {
+        flag.value = '';
+        input.disabled = true;
+        input.style.display = 'none';
+        input.value = '';
+      }
+    }
+
     function updateItemFields(selectEl) {
       const row = selectEl.closest('.line-item');
       const seasonSelect = row.querySelector('.season-select');
@@ -161,6 +204,7 @@
         itemCustomInput.focus();
 
         seasonSelect.innerHTML = '<option value="">Não aplicável</option>';
+        toggleSeasonCustom(seasonSelect);
         kitSelect.innerHTML = '<option value="">Não aplicável</option>';
 
         sizeSelect.disabled = true;
@@ -181,7 +225,8 @@
         .split(',')
         .map(function (s) { return s.trim(); })
         .filter(Boolean);
-      populateOptionalSelect(seasonSelect, seasons, 'Escolhe a temporada');
+      populateSeasonSelect(seasonSelect, seasons);
+      toggleSeasonCustom(seasonSelect);
 
       const kitTypes = (selected.dataset.kitTypes || '')
         .split(',')
@@ -302,6 +347,13 @@
       itemCustomInput.style.display = 'none';
 
       seasonSelect.innerHTML = '<option value="" disabled selected>Escolhe um artigo primeiro</option>';
+      seasonSelect.disabled = false;
+      seasonSelect.style.display = '';
+      row.querySelector('.season-custom-flag').value = '';
+      const seasonCustomInput = row.querySelector('.season-custom-input');
+      seasonCustomInput.value = '';
+      seasonCustomInput.disabled = true;
+      seasonCustomInput.style.display = 'none';
 
       kitSelect.innerHTML = '<option value="" disabled selected>Escolhe um artigo primeiro</option>';
 
