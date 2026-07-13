@@ -408,6 +408,27 @@ a.admin-link {
   object-fit: cover;
   border-radius: 6px;
   border: 1px solid var(--border);
+  cursor: zoom-in;
+}
+
+.lightbox {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 1000;
+  cursor: zoom-out;
+}
+
+.lightbox img {
+  max-width: min(90vw, 600px);
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 8px;
+  border: 1px solid var(--border);
 }
 
 .vintage-note-field {

@@ -100,7 +100,7 @@
               <input type="number" name="quantity[]" min="1" value="1" class="qty-input">
             </div>
             <button type="button" class="remove-item-btn" onclick="removeLineItem(this)">&times;</button>
-            <img class="item-preview" alt="">
+            <img class="item-preview" alt="" onclick="openLightbox(this.src)">
             <div class="vintage-note-field" style="display:none;">
               <label class="vintage-note-label">Vintage — o que procuras? (equipa, ano, jogador...)</label>
               <input type="text" name="item_note[]" class="vintage-note-input" placeholder="ex: Brasil 1994, camisola do Ronaldinho">
@@ -135,7 +135,26 @@
     <a class="admin-link" href="{{ url_for('admin_catalog') }}">administração</a>
   </div>
 
+  <div id="lightbox" class="lightbox" onclick="closeLightbox()">
+    <img id="lightbox-img" src="" alt="">
+  </div>
+
   <script>
+    function openLightbox(src) {
+      if (!src) return;
+      document.getElementById('lightbox-img').src = src;
+      document.getElementById('lightbox').style.display = 'flex';
+    }
+
+    function closeLightbox() {
+      document.getElementById('lightbox').style.display = 'none';
+      document.getElementById('lightbox-img').src = '';
+    }
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closeLightbox();
+    });
+
     function populateSeasonSelect(selectEl, values) {
       selectEl.innerHTML = '';
       const placeholder = document.createElement('option');
