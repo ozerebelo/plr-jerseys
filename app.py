@@ -27,7 +27,7 @@ STATUS_LABELS = {
     "fulfilled": "Entregue",
     "rejected": "Rejeitado",
 }
-SIZES = ["XS", "S", "M", "L", "XL", "XXL", "XXXL", "4XL"]
+SIZES = ["XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL"]
 CATEGORIES = [
     "1ª Liga",
     "La Liga",
@@ -202,17 +202,7 @@ def init_db():
             WHERE category IN ('Mundial 2026', 'Euro 2024', 'Outras Seleções')
             """
         )
-        # One-time backfill: add 4XL to every existing catalog item. Remove after it has run once in production.
-        db.execute(
-            """
-            UPDATE catalog_items
-            SET size = CASE
-                WHEN size IS NULL OR size = '' THEN '4XL'
-                ELSE size || ', 4XL'
-            END
-            WHERE size IS NULL OR position('4XL' IN size) = 0
-            """
-        )
+        db.execute("UPDATE catalog_items SET size = replace(size, 'XXXL', '3XL') WHERE size LIKE '%XXXL%'")
         db.commit()
 
 
