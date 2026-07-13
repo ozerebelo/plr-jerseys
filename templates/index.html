@@ -59,7 +59,7 @@
           <div class="line-item">
             <div class="item-field">
               <label class="mobile-field-label">Artigo</label>
-              <select name="item_description[]" class="item-select" onchange="updateItemFields(this)">
+              <select name="item_description[]" class="item-select" onchange="updateItemFields(this)" required>
                 <option value="" disabled selected>Escolhe um artigo</option>
                 <option value="__custom__">+ Outro artigo (escreve à mão)</option>
                 {% for category, items in catalog_groups %}
@@ -166,11 +166,13 @@
         flag.value = '1';
         input.disabled = false;
         input.style.display = 'block';
+        input.required = true;
         input.focus();
       } else {
         flag.value = '';
         input.disabled = true;
         input.style.display = 'none';
+        input.required = false;
         input.value = '';
       }
     }
@@ -205,11 +207,13 @@
         flag.value = '1';
         input.disabled = false;
         input.style.display = 'block';
+        input.required = true;
         input.focus();
       } else {
         flag.value = '';
         input.disabled = true;
         input.style.display = 'none';
+        input.required = false;
         input.value = '';
       }
     }
@@ -228,23 +232,30 @@
         selectEl.style.display = 'none';
         itemCustomInput.disabled = false;
         itemCustomInput.style.display = 'block';
+        itemCustomInput.required = true;
         itemCustomInput.focus();
 
         seasonSelect.innerHTML = '<option value="">Não aplicável</option>';
+        seasonSelect.required = false;
         toggleSeasonCustom(seasonSelect);
         kitSelect.innerHTML = '<option value="">Não aplicável</option>';
+        kitSelect.required = false;
         toggleKitCustom(kitSelect);
 
         sizeSelect.disabled = true;
         sizeSelect.style.display = 'none';
+        sizeSelect.required = false;
         sizeCustomInput.disabled = false;
         sizeCustomInput.style.display = 'block';
+        sizeCustomInput.required = true;
 
         preview.removeAttribute('src');
         preview.style.display = 'none';
         updateVintageNoteField(row, false);
         return;
       }
+
+      itemCustomInput.required = false;
 
       const selected = selectEl.options[selectEl.selectedIndex];
       updateVintageNoteField(row, selected.dataset.category === 'Vintage');
@@ -254,6 +265,9 @@
         .map(function (s) { return s.trim(); })
         .filter(Boolean);
       populateSeasonSelect(seasonSelect, seasons);
+      seasonSelect.disabled = false;
+      seasonSelect.style.display = '';
+      seasonSelect.required = seasons.length > 0;
       toggleSeasonCustom(seasonSelect);
 
       const kitTypes = (selected.dataset.kitTypes || '')
@@ -261,6 +275,9 @@
         .map(function (s) { return s.trim(); })
         .filter(Boolean);
       populateKitSelect(kitSelect, kitTypes);
+      kitSelect.disabled = false;
+      kitSelect.style.display = '';
+      kitSelect.required = kitTypes.length > 0;
       toggleKitCustom(kitSelect);
 
       const sizes = (selected.dataset.sizes || '')
@@ -269,6 +286,12 @@
         .filter(Boolean);
 
       sizeSelect.innerHTML = '';
+      sizeSelect.disabled = false;
+      sizeSelect.style.display = '';
+      sizeSelect.required = sizes.length > 0;
+      sizeCustomInput.disabled = true;
+      sizeCustomInput.style.display = 'none';
+      sizeCustomInput.required = false;
 
       const placeholder = document.createElement('option');
       placeholder.value = '';
@@ -374,31 +397,38 @@
       itemCustomInput.value = '';
       itemCustomInput.disabled = true;
       itemCustomInput.style.display = 'none';
+      itemCustomInput.required = false;
 
       seasonSelect.innerHTML = '<option value="" disabled selected>Escolhe um artigo primeiro</option>';
       seasonSelect.disabled = false;
       seasonSelect.style.display = '';
+      seasonSelect.required = false;
       row.querySelector('.season-custom-flag').value = '';
       const seasonCustomInput = row.querySelector('.season-custom-input');
       seasonCustomInput.value = '';
       seasonCustomInput.disabled = true;
       seasonCustomInput.style.display = 'none';
+      seasonCustomInput.required = false;
 
       kitSelect.innerHTML = '<option value="" disabled selected>Escolhe um artigo primeiro</option>';
       kitSelect.disabled = false;
       kitSelect.style.display = '';
+      kitSelect.required = false;
       row.querySelector('.kit-custom-flag').value = '';
       const kitCustomInput = row.querySelector('.kit-custom-input');
       kitCustomInput.value = '';
       kitCustomInput.disabled = true;
       kitCustomInput.style.display = 'none';
+      kitCustomInput.required = false;
 
       sizeSelect.innerHTML = '<option value="" disabled selected>Escolhe um artigo primeiro</option>';
       sizeSelect.disabled = false;
       sizeSelect.style.display = '';
+      sizeSelect.required = false;
       sizeCustomInput.value = '';
       sizeCustomInput.disabled = true;
       sizeCustomInput.style.display = 'none';
+      sizeCustomInput.required = false;
 
       row.querySelector('.qty-input').value = 1;
       preview.removeAttribute('src');
