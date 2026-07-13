@@ -58,6 +58,7 @@
         <div id="items-container">
           <div class="line-item">
             <div class="item-field">
+              <label class="mobile-field-label">Artigo</label>
               <select name="item_description[]" class="item-select" onchange="updateItemFields(this)">
                 <option value="" disabled selected>Escolhe um artigo</option>
                 <option value="__custom__">+ Outro artigo (escreve à mão)</option>
@@ -72,6 +73,7 @@
               <input type="text" name="item_description[]" class="item-custom-input" placeholder="Nome do artigo" disabled>
             </div>
             <div class="season-field">
+              <label class="mobile-field-label">Temporada</label>
               <select name="season[]" class="season-select" onchange="updatePreviewImage(this); toggleSeasonCustom(this)">
                 <option value="" disabled selected>Escolhe um artigo primeiro</option>
               </select>
@@ -79,6 +81,7 @@
               <input type="text" name="season[]" class="season-custom-input" placeholder="ex: 2015/2016" disabled>
             </div>
             <div class="kit-field">
+              <label class="mobile-field-label">Tipo</label>
               <select name="kit_type[]" class="kit-select" onchange="updatePreviewImage(this); toggleKitCustom(this)">
                 <option value="" disabled selected>Escolhe um artigo primeiro</option>
               </select>
@@ -86,12 +89,16 @@
               <input type="text" name="kit_type[]" class="kit-custom-input" placeholder="ex: Treino" disabled>
             </div>
             <div class="size-field">
+              <label class="mobile-field-label">Tamanho</label>
               <select name="size[]" class="size-select">
                 <option value="" disabled selected>Escolhe um artigo primeiro</option>
               </select>
               <input type="text" name="size[]" class="size-custom-input" placeholder="Tamanho" disabled>
             </div>
-            <input type="number" name="quantity[]" min="1" value="1" class="qty-input">
+            <div class="qty-field">
+              <label class="mobile-field-label">Qtd</label>
+              <input type="number" name="quantity[]" min="1" value="1" class="qty-input">
+            </div>
             <button type="button" class="remove-item-btn" onclick="removeLineItem(this)">&times;</button>
             <img class="item-preview" alt="">
             <div class="vintage-note-field" style="display:none;">
