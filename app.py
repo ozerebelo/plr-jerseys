@@ -19,13 +19,14 @@ ALLOWED_IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
 
 app = Flask(__name__, static_folder="public", static_url_path="")
 
-STATUSES = ["pending", "confirmed", "paid", "fulfilled", "rejected"]
+STATUSES = ["pending", "confirmed", "paid", "fulfilled", "rejected", "cancelled"]
 STATUS_LABELS = {
     "pending": "Pendente",
     "confirmed": "Confirmado",
     "paid": "Pago",
     "fulfilled": "Entregue",
     "rejected": "Rejeitado",
+    "cancelled": "Cancelado",
 }
 SIZES = ["XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL"]
 CATEGORIES = [
@@ -262,12 +263,22 @@ def send_new_order_email(coworker_name, phone, notes, line_items, custom_request
         return
 
     rows_html = ""
-    for name, season, kit_type, size, quantity, is_custom, price_str, personalization, item_note, item_image_url in line_items:
+    for line in line_items:
         details = ", ".join(
-            filter(None, [season, kit_type, size and f"tam. {size}", price_str, personalization and f"personalizar: {personalization}", item_note])
+            filter(
+                None,
+                [
+                    line["season"],
+                    line["kit_type"],
+                    line["size"] and f"tam. {line['size']}",
+                    line["price_str"],
+                    line["personalization"] and f"personalizar: {line['personalization']}",
+                    line["item_note"],
+                ],
+            )
         )
-        label = f"{name} (fora do catálogo)" if is_custom else name
-        rows_html += f"<li>{quantity}x {label}" + (f" — {details}" if details else "") + "</li>"
+        label = f"{line['name']} (fora do catálogo)" if line["is_custom"] else line["name"]
+        rows_html += f"<li>{line['quantity']}x {label}" + (f" — {details}" if details else "") + "</li>"
 
     custom_html = f"<p><strong>Pergunta/pedido:</strong> {custom_request_text}</p>" if custom_request_text else ""
     notes_html = f"<p><strong>Notas:</strong> {notes}</p>" if notes else ""
@@ -397,33 +408,50 @@ def index():
     return render_template("index.html", catalog=catalog, catalog_groups=group_catalog_by_category(catalog))
 
 
-@app.route("/order", methods=["POST"])
-def create_order():
-    coworker_name = request.form.get("coworker_name", "").strip()
-    phone = request.form.get("phone", "").strip()
-    notes = request.form.get("notes", "").strip()
-    custom_request_text = request.form.get("custom_request", "").strip()
-    item_names = request.form.getlist("item_description[]")
-    seasons = request.form.getlist("season[]")
-    season_custom_flags = request.form.getlist("season_is_custom[]")
-    kit_types = request.form.getlist("kit_type[]")
-    kit_type_custom_flags = request.form.getlist("kit_type_is_custom[]")
-    sizes = request.form.getlist("size[]")
-    quantities = request.form.getlist("quantity[]")
-    personalize_flags = request.form.getlist("personalize[]")
-    personalize_texts = request.form.getlist("personalize_text[]")
-    item_notes = request.form.getlist("item_note[]")
-    item_images = request.files.getlist("item_image[]")
+def is_group_editable(group):
+    return bool(group["lines"]) and all(line["status"] == "pending" for line in group["lines"])
+
+
+@app.route("/as-minhas-encomendas", methods=["GET", "POST"])
+def my_orders():
+    phone = (request.form.get("phone") if request.method == "POST" else request.args.get("phone", "")).strip()
+    if not phone:
+        error = "Escreve o teu telemóvel." if request.method == "POST" else None
+        return render_template("my_orders.html", searched=False, order_groups=None, error=error)
 
     db = get_db()
-    catalog = enrich_catalog_items(
-        db,
-        db.execute(
-            "SELECT * FROM catalog_items WHERE available = 1 ORDER BY category ASC NULLS LAST, name ASC"
-        ).fetchall(),
+    order_groups, _ = build_order_groups(db, phone=phone)
+    for group in order_groups:
+        group["editable"] = is_group_editable(group)
+
+    return render_template(
+        "my_orders.html",
+        searched=True,
+        order_groups=order_groups,
+        phone=phone,
+        status_labels=STATUS_LABELS,
+        custom_request_status_labels=CUSTOM_REQUEST_STATUS_LABELS,
     )
-    catalog_by_name = {c["name"]: c for c in catalog}
-    catalog_groups = group_catalog_by_category(catalog)
+
+
+def parse_order_form(form, files, catalog_by_name):
+    """Reads + validates the order form. Returns a dict with the parsed fields on
+    success, or a dict with only an "error" key on failure."""
+    coworker_name = form.get("coworker_name", "").strip()
+    phone = form.get("phone", "").strip()
+    notes = form.get("notes", "").strip()
+    custom_request_text = form.get("custom_request", "").strip()
+    item_names = form.getlist("item_description[]")
+    seasons = form.getlist("season[]")
+    season_custom_flags = form.getlist("season_is_custom[]")
+    kit_types = form.getlist("kit_type[]")
+    kit_type_custom_flags = form.getlist("kit_type_is_custom[]")
+    sizes = form.getlist("size[]")
+    quantities = form.getlist("quantity[]")
+    personalize_flags = form.getlist("personalize[]")
+    personalize_texts = form.getlist("personalize_text[]")
+    item_notes = form.getlist("item_note[]")
+    item_images = files.getlist("item_image[]")
 
     line_items = []
     for i, raw_name in enumerate(item_names):
@@ -445,66 +473,31 @@ def create_order():
         if matched_item:
             valid_sizes = [s.strip() for s in (matched_item["size"] or "").split(",") if s.strip()]
             if valid_sizes and size not in valid_sizes:
-                return render_template(
-                    "index.html",
-                    error="Um dos artigos ou tamanhos não é válido — volta a escolher da lista.",
-                    catalog=catalog,
-                    catalog_groups=catalog_groups,
-                )
+                return {"error": "Um dos artigos ou tamanhos não é válido — volta a escolher da lista."}
             if not valid_sizes:
                 size = ""
             if kit_type_is_custom:
                 if not kit_type:
-                    return render_template(
-                        "index.html",
-                        error="Escreve o tipo que procuras, ou desmarca a opção de tipo personalizado.",
-                        catalog=catalog,
-                        catalog_groups=catalog_groups,
-                    )
+                    return {"error": "Escreve o tipo que procuras, ou desmarca a opção de tipo personalizado."}
             else:
                 valid_kit_types = [k.strip() for k in (matched_item["kit_types"] or "").split(",") if k.strip()]
                 if valid_kit_types and kit_type not in valid_kit_types:
-                    return render_template(
-                        "index.html",
-                        error="Um dos tipos de camisola não é válido — volta a escolher da lista.",
-                        catalog=catalog,
-                        catalog_groups=catalog_groups,
-                    )
+                    return {"error": "Um dos tipos de camisola não é válido — volta a escolher da lista."}
                 if not valid_kit_types:
                     kit_type = ""
             if season_is_custom:
                 if not season:
-                    return render_template(
-                        "index.html",
-                        error="Escreve a temporada que procuras, ou desmarca a opção de temporada personalizada.",
-                        catalog=catalog,
-                        catalog_groups=catalog_groups,
-                    )
+                    return {"error": "Escreve a temporada que procuras, ou desmarca a opção de temporada personalizada."}
             else:
                 valid_seasons = [s.strip() for s in (matched_item["seasons"] or "").split(",") if s.strip()]
                 if valid_seasons and season not in valid_seasons:
-                    return render_template(
-                        "index.html",
-                        error="Uma das temporadas não é válida — volta a escolher da lista.",
-                        catalog=catalog,
-                        catalog_groups=catalog_groups,
-                    )
+                    return {"error": "Uma das temporadas não é válida — volta a escolher da lista."}
                 if not valid_seasons:
                     season = ""
             if personalized and not personalization:
-                return render_template(
-                    "index.html",
-                    error="Escreve o nome/número a personalizar, ou desmarca a personalização.",
-                    catalog=catalog,
-                    catalog_groups=catalog_groups,
-                )
+                return {"error": "Escreve o nome/número a personalizar, ou desmarca a personalização."}
             if matched_item["category"] == "Vintage" and not item_note:
-                return render_template(
-                    "index.html",
-                    error="Escreve o que procuras no artigo Vintage (equipa, ano, jogador...).",
-                    catalog=catalog,
-                    catalog_groups=catalog_groups,
-                )
+                return {"error": "Escreve o que procuras no artigo Vintage (equipa, ano, jogador...)."}
             if matched_item["category"] != "Vintage":
                 item_note = ""
             base_price = VINTAGE_PRICE if matched_item["category"] == "Vintage" else BASE_PRICE
@@ -513,12 +506,7 @@ def create_order():
             is_custom = False
         else:
             if not name or not size:
-                return render_template(
-                    "index.html",
-                    error="Preenche o nome e o tamanho do artigo personalizado.",
-                    catalog=catalog,
-                    catalog_groups=catalog_groups,
-                )
+                return {"error": "Preenche o nome e o tamanho do artigo personalizado."}
             season = ""
             kit_type = ""
             price_str = None
@@ -534,20 +522,59 @@ def create_order():
         item_image_url = save_uploaded_image(image_file)
 
         line_items.append(
-            (name, season, kit_type, size, quantity, is_custom, price_str, personalization, item_note, item_image_url)
+            {
+                "name": name,
+                "season": season,
+                "kit_type": kit_type,
+                "size": size,
+                "quantity": quantity,
+                "is_custom": is_custom,
+                "price_str": price_str,
+                "personalization": personalization,
+                "item_note": item_note,
+                "item_image_url": item_image_url,
+            }
         )
 
     if not coworker_name or not phone or (not line_items and not custom_request_text):
+        return {"error": "Preenche o teu nome, o teu telemóvel, e escolhe um artigo ou descreve o que procuras."}
+
+    return {
+        "coworker_name": coworker_name,
+        "phone": phone,
+        "notes": notes,
+        "custom_request_text": custom_request_text,
+        "line_items": line_items,
+    }
+
+
+@app.route("/order", methods=["POST"])
+def create_order():
+    db = get_db()
+    catalog = enrich_catalog_items(
+        db,
+        db.execute(
+            "SELECT * FROM catalog_items WHERE available = 1 ORDER BY category ASC NULLS LAST, name ASC"
+        ).fetchall(),
+    )
+    catalog_by_name = {c["name"]: c for c in catalog}
+    catalog_groups = group_catalog_by_category(catalog)
+
+    parsed = parse_order_form(request.form, request.files, catalog_by_name)
+    if "error" in parsed:
         return render_template(
-            "index.html",
-            error="Preenche o teu nome, o teu telemóvel, e escolhe um artigo ou descreve o que procuras.",
-            catalog=catalog,
-            catalog_groups=catalog_groups,
+            "index.html", error=parsed["error"], catalog=catalog, catalog_groups=catalog_groups
         )
+
+    coworker_name = parsed["coworker_name"]
+    phone = parsed["phone"]
+    notes = parsed["notes"]
+    custom_request_text = parsed["custom_request_text"]
+    line_items = parsed["line_items"]
 
     request_id = uuid.uuid4().hex[:8]
     created_at = datetime.now().isoformat(timespec="seconds")
-    for name, season, kit_type, size, quantity, is_custom, price_str, personalization, item_note, item_image_url in line_items:
+    for line in line_items:
         db.execute(
             """
             INSERT INTO orders
@@ -557,20 +584,20 @@ def create_order():
             """,
             (
                 coworker_name,
-                name,
-                season or None,
-                kit_type or None,
-                size,
-                quantity,
+                line["name"],
+                line["season"] or None,
+                line["kit_type"] or None,
+                line["size"],
+                line["quantity"],
                 notes,
-                price_str,
+                line["price_str"],
                 created_at,
                 request_id,
-                1 if is_custom else 0,
-                personalization or None,
-                item_note or None,
+                1 if line["is_custom"] else 0,
+                line["personalization"] or None,
+                line["item_note"] or None,
                 phone,
-                item_image_url,
+                line["item_image_url"],
             ),
         )
 
@@ -588,6 +615,160 @@ def create_order():
     send_new_order_email(coworker_name, phone, notes, line_items, custom_request_text)
 
     return render_template("index.html", success=True, catalog=catalog, catalog_groups=catalog_groups)
+
+
+def _find_own_group(db, request_id, phone):
+    if not phone:
+        return None
+    order_groups, _ = build_order_groups(db, phone=phone)
+    return next((g for g in order_groups if g["request_id"] == request_id), None)
+
+
+def _build_edit_lines(group_lines):
+    return [
+        {
+            "is_custom": bool(line["is_custom"]),
+            "item_description": line["item_description"],
+            "season": line["season"] or "",
+            "kit_type": line["kit_type"] or "",
+            "size": line["size"] or "",
+            "quantity": line["quantity"],
+            "personalization": line["personalization"] or "",
+            "item_note": line["item_note"] or "",
+            "item_image_url": resolve_image_src(line["item_image_url"]),
+        }
+        for line in group_lines
+    ]
+
+
+@app.route("/pedido/<request_id>/editar", methods=["GET"])
+def edit_order(request_id):
+    phone = request.args.get("phone", "").strip()
+    db = get_db()
+    group = _find_own_group(db, request_id, phone)
+    if not group or not is_group_editable(group):
+        return redirect(url_for("my_orders", phone=phone))
+
+    catalog = enrich_catalog_items(
+        db,
+        db.execute(
+            "SELECT * FROM catalog_items WHERE available = 1 ORDER BY category ASC NULLS LAST, name ASC"
+        ).fetchall(),
+    )
+    edit_lines = _build_edit_lines(group["lines"])
+
+    return render_template(
+        "edit_order.html",
+        catalog=catalog,
+        catalog_groups=group_catalog_by_category(catalog),
+        group=group,
+        phone=phone,
+        request_id=request_id,
+        edit_lines=edit_lines,
+    )
+
+
+@app.route("/pedido/<request_id>/editar", methods=["POST"])
+def update_own_order(request_id):
+    phone = request.form.get("phone", "").strip()
+    db = get_db()
+    group = _find_own_group(db, request_id, phone)
+    if not group or not is_group_editable(group):
+        return redirect(url_for("my_orders", phone=phone))
+
+    catalog = enrich_catalog_items(
+        db,
+        db.execute(
+            "SELECT * FROM catalog_items WHERE available = 1 ORDER BY category ASC NULLS LAST, name ASC"
+        ).fetchall(),
+    )
+    catalog_by_name = {c["name"]: c for c in catalog}
+    catalog_groups = group_catalog_by_category(catalog)
+
+    parsed = parse_order_form(request.form, request.files, catalog_by_name)
+    if "error" in parsed:
+        return render_template(
+            "edit_order.html",
+            error=parsed["error"],
+            catalog=catalog,
+            catalog_groups=catalog_groups,
+            group=group,
+            phone=phone,
+            request_id=request_id,
+            edit_lines=_build_edit_lines(group["lines"]),
+        )
+
+    if parsed["phone"] != phone:
+        return render_template(
+            "edit_order.html",
+            error="O telemóvel não pode ser alterado aqui — contacta o administrador.",
+            catalog=catalog,
+            catalog_groups=catalog_groups,
+            group=group,
+            phone=phone,
+            request_id=request_id,
+            edit_lines=_build_edit_lines(group["lines"]),
+        )
+
+    coworker_name = parsed["coworker_name"]
+    notes = parsed["notes"]
+    custom_request_text = parsed["custom_request_text"]
+    line_items = parsed["line_items"]
+    created_at = group["created_at"]
+
+    db.execute("DELETE FROM orders WHERE request_id = %s", (request_id,))
+    db.execute("DELETE FROM custom_requests WHERE request_id = %s", (request_id,))
+
+    for line in line_items:
+        db.execute(
+            """
+            INSERT INTO orders
+                (coworker_name, item_description, season, kit_type, size, quantity, notes, status,
+                 price, created_at, request_id, is_custom, personalization, item_note, phone, item_image_url)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, 'pending', %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (
+                coworker_name,
+                line["name"],
+                line["season"] or None,
+                line["kit_type"] or None,
+                line["size"],
+                line["quantity"],
+                notes,
+                line["price_str"],
+                created_at,
+                request_id,
+                1 if line["is_custom"] else 0,
+                line["personalization"] or None,
+                line["item_note"] or None,
+                phone,
+                line["item_image_url"],
+            ),
+        )
+
+    if custom_request_text:
+        db.execute(
+            """
+            INSERT INTO custom_requests (request_id, coworker_name, description, status, created_at, phone)
+            VALUES (%s, %s, %s, 'pending', %s, %s)
+            """,
+            (request_id, coworker_name, custom_request_text, created_at, phone),
+        )
+
+    db.commit()
+
+    return redirect(url_for("my_orders", phone=phone))
+
+
+@app.route("/pedido/<request_id>/cancelar", methods=["POST"])
+def cancel_order(request_id):
+    phone = request.form.get("phone", "").strip()
+    db = get_db()
+    group = _find_own_group(db, request_id, phone)
+    if group and is_group_editable(group):
+        db.execute("UPDATE orders SET status = 'cancelled' WHERE request_id = %s", (request_id,))
+        db.commit()
+    return redirect(url_for("my_orders", phone=phone))
 
 
 @app.route("/admin")
@@ -609,10 +790,16 @@ def admin_catalog():
     )
 
 
-@app.route("/admin/encomendas")
-def admin_orders():
-    db = get_db()
-    rows = db.execute("SELECT * FROM orders ORDER BY created_at DESC, id ASC").fetchall()
+def build_order_groups(db, phone=None):
+    """Groups orders (+ any linked custom request) by request_id. When phone is
+    given, only that phone's orders/requests are included — used by the
+    self-service "as minhas encomendas" page; admin calls this with phone=None."""
+    if phone:
+        rows = db.execute(
+            "SELECT * FROM orders WHERE phone = %s ORDER BY created_at DESC, id ASC", (phone,)
+        ).fetchall()
+    else:
+        rows = db.execute("SELECT * FROM orders ORDER BY created_at DESC, id ASC").fetchall()
 
     groups = {}
     for _, group_rows in groupby(rows, key=lambda o: o["request_id"] or f"single-{o['id']}"):
@@ -656,7 +843,12 @@ def admin_orders():
             "total_margin": (total_price - total_cost) if all_priced and all_costed else None,
         }
 
-    custom_rows = db.execute("SELECT * FROM custom_requests ORDER BY created_at DESC, id ASC").fetchall()
+    if phone:
+        custom_rows = db.execute(
+            "SELECT * FROM custom_requests WHERE phone = %s ORDER BY created_at DESC, id ASC", (phone,)
+        ).fetchall()
+    else:
+        custom_rows = db.execute("SELECT * FROM custom_requests ORDER BY created_at DESC, id ASC").fetchall()
     for row in custom_rows:
         key = row["request_id"] or f"custom-{row['id']}"
         if key in groups:
@@ -678,6 +870,13 @@ def admin_orders():
             }
 
     order_groups = sorted(groups.values(), key=lambda g: g["created_at"], reverse=True)
+    return order_groups, rows
+
+
+@app.route("/admin/encomendas")
+def admin_orders():
+    db = get_db()
+    order_groups, rows = build_order_groups(db)
 
     supplier_order_rows = db.execute("SELECT * FROM supplier_orders ORDER BY created_at DESC").fetchall()
     linked_by_supplier = {}

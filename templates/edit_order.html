@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PLR-Jerseys — Pedido de Camisola</title>
+  <title>PLR-Jerseys — Editar Pedido</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&display=swap" rel="stylesheet">
@@ -14,34 +14,22 @@
     <header class="site-header">
       <a class="brand" href="{{ url_for('index') }}"><span class="brand-mark">PLR</span><span class="brand-rest">-Jerseys</span></a>
     </header>
-    <h1>Pedido de Camisola</h1>
-    <p class="subtitle">Preenche isto e eu verifico o stock e o preço, depois digo-te alguma coisa.</p>
+    <h1>Editar Pedido</h1>
+    <p class="subtitle">Altera o que precisares e volta a enviar. Isto substitui o pedido original.</p>
 
-    <div class="card instructions-card">
-      <p class="card-title">Como funciona</p>
-      <ol class="instructions-list">
-        <li>Escolhe um artigo do catálogo, depois a temporada, tipo, tamanho e quantidade.</li>
-        <li>Se quiseres personalizar (nome, número, logos), marca a opção — tem custo extra.</li>
-        <li>Envia o pedido. Confirmo o stock e o preço contigo a seguir, antes de encomendar.</li>
-      </ol>
-      <p class="instructions-note"><strong>Artigos Vintage:</strong> escolhe o artigo "Vintage" no catálogo e escreve no campo que aparece o que procuras (equipa, ano, jogador...).</p>
-      <p class="instructions-note"><strong>Não está no catálogo?</strong> Escolhe "+ Outro artigo", escreve o nome à mão e/ou anexa uma foto do que queres na opção "Tens uma foto do que queres?" — trato do resto a partir daí.</p>
-    </div>
-
-    {% if success %}
-      <div class="success">Obrigado! O teu pedido foi enviado. Aviso assim que verificar o stock e o preço.</div>
-    {% endif %}
     {% if error %}
       <div class="error">{{ error }}</div>
     {% endif %}
 
     <div class="card">
-      <form method="POST" action="{{ url_for('create_order') }}" enctype="multipart/form-data">
-        <label for="coworker_name">O teu nome</label>
-        <input type="text" id="coworker_name" name="coworker_name" required>
+      <form method="POST" action="{{ url_for('update_own_order', request_id=request_id) }}" enctype="multipart/form-data">
+        <input type="hidden" name="phone" value="{{ phone }}">
 
-        <label for="phone">Telemóvel</label>
-        <input type="tel" id="phone" name="phone" placeholder="912 345 678" required>
+        <label for="coworker_name">O teu nome</label>
+        <input type="text" id="coworker_name" name="coworker_name" value="{{ group.coworker_name }}" required>
+
+        <label for="phone_display">Telemóvel</label>
+        <input type="tel" id="phone_display" value="{{ phone }}" disabled>
 
         <label>Artigos</label>
         {% if not catalog %}
@@ -123,18 +111,16 @@
         <p class="muted-text" style="margin-top: 8px;">Um artigo escrito à mão não tem preço definido — confirmo contigo depois de veres o pedido.</p>
 
         <label for="custom_request">Tens só uma pergunta? Escreve aqui (opcional)</label>
-        <textarea id="custom_request" name="custom_request" placeholder="ex: Tens tamanhos de criança?"></textarea>
+        <textarea id="custom_request" name="custom_request" placeholder="ex: Tens tamanhos de criança?">{{ group.custom_request.description if group.custom_request else '' }}</textarea>
 
         <label for="notes">Notas (opcional)</label>
-        <textarea id="notes" name="notes" placeholder="Entrega urgente, outras instruções, etc."></textarea>
+        <textarea id="notes" name="notes" placeholder="Entrega urgente, outras instruções, etc.">{{ group.notes or '' }}</textarea>
 
-        <button type="submit">Enviar Pedido</button>
+        <button type="submit">Guardar Alterações</button>
       </form>
     </div>
 
-    <a class="admin-link" href="{{ url_for('my_orders') }}">as minhas encomendas</a>
-    &middot;
-    <a class="admin-link" href="{{ url_for('admin_catalog') }}">administração</a>
+    <a class="admin-link" href="{{ url_for('my_orders', phone=phone) }}">cancelar edição, voltar</a>
   </div>
 
   <div id="lightbox" class="lightbox" onclick="closeLightbox()">
@@ -142,5 +128,8 @@
   </div>
 
   <script src="{{ url_for('static', filename='order-form.js') }}"></script>
+  <script>
+    bootstrapEditForm({{ edit_lines | tojson }});
+  </script>
 </body>
 </html>

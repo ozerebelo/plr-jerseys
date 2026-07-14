@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PLR-Jerseys — As Minhas Encomendas</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="container">
+    <header class="site-header">
+      <a class="brand" href="{{ url_for('index') }}"><span class="brand-mark">PLR</span><span class="brand-rest">-Jerseys</span></a>
+    </header>
+    <h1>As Minhas Encomendas</h1>
+    <p class="subtitle">Escreve o telemóvel que usaste no pedido para ver o estado, editar ou cancelar.</p>
+
+    {% if error %}
+      <div class="error">{{ error }}</div>
+    {% endif %}
+
+    <div class="card">
+      <form method="POST" action="{{ url_for('my_orders') }}">
+        <label for="phone">Telemóvel</label>
+        <input type="tel" id="phone" name="phone" placeholder="912 345 678" value="{{ phone or '' }}" required>
+        <button type="submit">Procurar</button>
+      </form>
+    </div>
+
+    {% if searched %}
+      {% if not order_groups %}
+      <div class="card"><p style="color: var(--muted); margin: 0;">Nenhuma encomenda encontrada com esse número.</p></div>
+      {% endif %}
+
+      {% for group in order_groups %}
+      <div class="card order-card">
+        <div class="order-card-header">
+          <div>
+            <strong>{{ group.coworker_name }}</strong>
+            <span class="muted-text">{{ group.created_at }}</span>
+            {% if group.request_id %}<span class="req-id">{{ group.request_id[:6] }}</span>{% endif %}
+          </div>
+          {% if group.notes %}<div class="muted-text">Nota: {{ group.notes }}</div>{% endif %}
+        </div>
+
+        {% if group.lines %}
+        <div style="overflow-x: auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>Artigo</th>
+                <th>Temporada</th>
+                <th>Tipo</th>
+                <th>Tamanho</th>
+                <th>Qtd</th>
+                <th>Estado</th>
+                <th>Venda</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for order in group.lines %}
+              <tr>
+                <td>{{ order.item_description }}{% if order.is_custom %} <span class="badge-custom">Fora do catálogo</span>{% endif %}{% if order.item_note %}<div class="muted-text">{{ order.item_note }}</div>{% endif %}</td>
+                <td>{{ order.season or "—" }}</td>
+                <td>{{ order.kit_type or "—" }}</td>
+                <td>{{ order.size }}</td>
+                <td>{{ order.quantity }}</td>
+                <td><span class="badge {{ order.status }}">{{ status_labels[order.status] }}</span></td>
+                <td>{{ order.price or "" }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% endif %}
+
+        {% if group.custom_request %}
+        <div class="custom-request-block">
+          <div class="muted-text">
+            Pedido personalizado
+            <span class="badge {{ group.custom_request.status }}">{{ custom_request_status_labels[group.custom_request.status] }}</span>
+          </div>
+          <p class="custom-request-text">{{ group.custom_request.description }}</p>
+          {% if group.custom_request.admin_reply %}<p class="muted-text">Resposta: {{ group.custom_request.admin_reply }}</p>{% endif %}
+        </div>
+        {% endif %}
+
+        {% if group.total_price is not none %}
+        <div class="order-card-footer">
+          Total de venda: {{ '%.2f'|format(group.total_price) }}{% if group.total_price_partial %}<span class="tiny-date"> (parcial)</span>{% endif %}
+        </div>
+        {% endif %}
+
+        {% if group.editable %}
+        <div class="inline-form" style="margin-top: 10px;">
+          <form method="GET" action="{{ url_for('edit_order', request_id=group.request_id) }}">
+            <input type="hidden" name="phone" value="{{ phone }}">
+            <button type="submit">Editar</button>
+          </form>
+          <form method="POST" action="{{ url_for('cancel_order', request_id=group.request_id) }}" onsubmit="return confirm('Cancelar esta encomenda?');">
+            <input type="hidden" name="phone" value="{{ phone }}">
+            <button type="submit" class="delete-btn">Cancelar</button>
+          </form>
+        </div>
+        {% elif group.lines %}
+        <p class="muted-text" style="margin-top: 10px;">Já em processamento — contacta o administrador para alterações.</p>
+        {% endif %}
+      </div>
+      {% endfor %}
+    {% endif %}
+
+    <a class="admin-link" href="{{ url_for('index') }}">voltar ao formulário de encomenda</a>
+  </div>
+</body>
+</html>

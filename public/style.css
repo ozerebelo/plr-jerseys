@@ -269,6 +269,7 @@ th {
 .badge.fulfilled { background: #164e63; color: #67e8f9; }
 .badge.rejected { background: #450a0a; color: #fca5a5; }
 .badge.answered { background: #1e3a8a; color: #93c5fd; }
+.badge.cancelled { background: #383838; color: #cbd5e1; }
 
 .badge-custom {
   display: inline-block;
