@@ -65,7 +65,7 @@
                 {% for category, items in catalog_groups %}
                 <optgroup label="{{ category }}">
                   {% for item in items %}
-                  <option value="{{ item.name }}" data-category="{{ item.category or '' }}" data-seasons="{{ item.seasons or '' }}" data-kit-types="{{ item.kit_types or '' }}" data-sizes="{{ item.size or '' }}" data-image="{{ image_src(item.image_url) or '' }}" data-images='{{ item.variant_images | tojson }}'>{{ item.name }} — {{ item.display_price }}</option>
+                  <option value="{{ item.name }}" data-category="{{ item.category or '' }}" data-seasons="{{ item.seasons or '' }}" data-kit-types="{{ item.kit_types or '' }}" data-sizes="{{ item.size or '' }}" data-image="{{ image_src(item.image_url) or '' }}" data-images='{{ item.variant_images | tojson }}'>{{ item.name }}</option>
                   {% endfor %}
                 </optgroup>
                 {% endfor %}
@@ -108,7 +108,7 @@
             <div class="personalize-field">
               <label class="personalize-check">
                 <input type="checkbox" class="personalize-checkbox" onchange="togglePersonalize(this)">
-                Personalizar (nome/número/logos, +2,50€)
+                Personalizar (nome/número/logos)
               </label>
               <input type="hidden" name="personalize[]" class="personalize-flag" value="">
               <input type="text" name="personalize_text[]" class="personalize-text" placeholder="ex: Ronaldo 7" style="display:none;">

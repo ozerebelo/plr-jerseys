@@ -51,9 +51,6 @@ SEASONS = [f"{_season_start_year - i}/{_season_start_year - i + 1}" for i in ran
     "Euro 2024",
     "Outras Seleções",
 ]
-BASE_PRICE = 22.0
-VINTAGE_PRICE = 25.0
-PERSONALIZATION_PRICE = 2.5
 CUSTOM_REQUEST_STATUSES = ["pending", "answered", "rejected"]
 CUSTOM_REQUEST_STATUS_LABELS = {
     "pending": "Pendente",
@@ -347,8 +344,6 @@ def enrich_catalog_items(db, catalog_rows):
     for row in catalog_rows:
         item = dict(row)
         item["category"] = item["category"] or ""
-        price = VINTAGE_PRICE if item["category"] == "Vintage" else BASE_PRICE
-        item["display_price"] = f"{price:.0f}€"
         item["variant_images"] = variants_by_item.get(item["id"], {})
         items.append(item)
     return items
@@ -500,9 +495,7 @@ def parse_order_form(form, files, catalog_by_name):
                 return {"error": "Escreve o que procuras no artigo Vintage (equipa, ano, jogador...)."}
             if matched_item["category"] != "Vintage":
                 item_note = ""
-            base_price = VINTAGE_PRICE if matched_item["category"] == "Vintage" else BASE_PRICE
-            price = base_price + (PERSONALIZATION_PRICE if personalized else 0)
-            price_str = f"{price:.2f}€"
+            price_str = None
             is_custom = False
         else:
             if not name or not size:
@@ -784,9 +777,6 @@ def admin_catalog():
         categories=CATEGORIES,
         kit_types=KIT_TYPES,
         seasons=SEASONS,
-        base_price=BASE_PRICE,
-        vintage_price=VINTAGE_PRICE,
-        personalization_price=PERSONALIZATION_PRICE,
     )
 
 
