@@ -52,7 +52,7 @@
       <div style="overflow-x: auto;">
         <table>
           <thead>
-            <tr><th>Colega</th><th>Artigo</th><th>Temporada</th><th>Tipo</th><th>Tamanho</th><th>Qtd</th><th>Venda</th><th>Custo</th></tr>
+            <tr><th>Colega</th><th>Artigo</th><th>Temporada</th><th>Tipo</th><th>Tamanho</th><th>Qtd</th><th>Estado</th><th>Venda</th><th>Custo</th></tr>
           </thead>
           <tbody>
             {% for o in so.linked %}
@@ -63,6 +63,7 @@
               <td>{{ o.kit_type or "—" }}</td>
               <td>{{ o.size }}</td>
               <td>{{ o.quantity }}</td>
+              <td><span class="badge {{ o.status }}">{{ status_labels[o.status] }}</span></td>
               <td>{{ o.price or "" }}</td>
               <td>{{ o.cost or "" }}</td>
             </tr>
